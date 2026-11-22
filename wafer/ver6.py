@@ -31,22 +31,38 @@ class MaskedLatentModel(nn.Module):
     mlp=False: 선형 Predictor(512→512, ver6) / mlp=True: 512→512→512 (BN+ReLU, BYOL 구조, ver6.1)
     """
 
-    def __init__(self, arch, mlp=False, size=None):
+    def __init__(self, arch, mlp=False, size=None, proj=False):
         super().__init__()
         self.encoder, dim = _encoder(arch)
         if size is not None:   # ver8.2: 인코더 (온라인 / 타깃 모두) 를 크기 조건 FiLM ResNet 으로
             self.encoder = FiLMResNet(self.encoder, size)
-        self.predictor = (nn.Sequential(nn.Linear(dim, dim), nn.BatchNorm1d(dim), nn.ReLU(inplace=True), nn.Linear(dim, dim))
-                          if mlp else nn.Linear(dim, dim))
+        mlp_ = lambda i, h, o: nn.Sequential(nn.Linear(i, h), nn.BatchNorm1d(h), nn.ReLU(inplace=True), nn.Linear(h, o))
+        if proj:   # y9.1: BYOL 식 projector (512→512→128) + predictor (128→512→128). 타깃 = EMA(인코더 + projector)
+            self.projector = mlp_(dim, dim, 128)
+            self.predictor = mlp_(128, dim, 128)
+        else:
+            self.projector = None
+            self.predictor = mlp_(dim, dim, dim) if mlp else nn.Linear(dim, dim)
         self.target = copy.deepcopy(self.encoder).requires_grad_(False)
+        self.target_projector = copy.deepcopy(self.projector).requires_grad_(False) if proj else None
+
+    def online(self, v):
+        h = self.encoder(v)
+        return self.predictor(self.projector(h) if self.projector is not None else h)
+
+    def tgt(self, v):
+        h = self.target(v)
+        return self.target_projector(h) if self.projector is not None else h
 
     @torch.no_grad()
     def update_target(self, m):
-        for t, o in zip(self.target.state_dict().values(), self.encoder.state_dict().values()):
-            if t.dtype.is_floating_point:
-                t.mul_(m).add_(o.detach(), alpha=1 - m)
-            else:
-                t.copy_(o)
+        pairs = [(self.target, self.encoder)] + ([(self.target_projector, self.projector)] if self.projector is not None else [])
+        for tm, om in pairs:
+            for t, o in zip(tm.state_dict().values(), om.state_dict().values()):
+                if t.dtype.is_floating_point:
+                    t.mul_(m).add_(o.detach(), alpha=1 - m)
+                else:
+                    t.copy_(o)
 
 
 def _predict(model, xm, bn_groups=None, idx=None):
@@ -58,9 +74,9 @@ def _predict(model, xm, bn_groups=None, idx=None):
     """
     n, b = xm.shape[:2]
     if idx is not None:
-        assert bn_groups is None
+        assert bn_groups is None and model.projector is None
         return model.predictor(model.encoder(to_input(xm.flatten(0, 1)), idx.repeat(n))).view(n, b, -1)
-    f = lambda v: model.predictor(model.encoder(to_input(v)))
+    f = lambda v: model.online(to_input(v))
     if bn_groups == "split":
         return torch.stack([f(xm[i]) for i in range(n)])
     if bn_groups == "together":
@@ -69,30 +85,44 @@ def _predict(model, xm, bn_groups=None, idx=None):
     return f(xm.flatten(0, 1)).view(n, b, -1)
 
 
-def consistency_loss(model, x, xm, per_view=False, bn_groups=None, idx=None):
+def consistency_loss(model, x, xm, per_view=False, bn_groups=None, idx=None, stats=None):
     """x: 원본 (B,1,H,W), xm: 마스킹본 (n,B,1,H,W). 반환: (loss, 원본 벡터 z).
 
     per_view=False: 1 - cos(mean(p_i), z) (ver6~ver7) / True: mean_i (1 - cos(p_i, z)) (ver7.2)
     idx: (B,) 웨이퍼 번호 — 크기 조건 인코더 (ver8.2) 일 때만
+    stats: dict 를 주면 stats["view_cos"] = 뷰별 cos(p_i, z) 평균 (n,) 을 채움 (y9.1 진단, 손실에는 영향 없음)
     """
     with torch.no_grad():
         model.target.train()  # BYOL 처럼 배치 통계로 BN (EMA 된 running 통계는 쓰지 않음)
-        z = (model.target(to_input(x)) if idx is None else model.target(to_input(x), idx)).float()
+        if model.target_projector is not None:
+            model.target_projector.train()
+        z = (model.tgt(to_input(x)) if idx is None else model.target(to_input(x), idx)).float()
     p = _predict(model, xm, bn_groups, idx).float()
+    if stats is not None:
+        with torch.no_grad():
+            stats["view_cos"] = F.cosine_similarity(p, z.unsqueeze(0), dim=2).mean(1)
     if per_view:                                       # 마스킹본 각각을 z 와 비교한 뒤 손실 평균
         return 1 - F.cosine_similarity(p, z.unsqueeze(0), dim=2).mean(), z
     p = p.mean(0)                                      # 4개 예측 벡터의 앙상블 평균
     return 1 - F.cosine_similarity(p, z, dim=1).mean(), z
 
 
-def _views(x, v61, cell=V61["cell"], n_masks=V61["n_masks"], ratio=0.5, dilate=0, stripes=False, crop=False):
+def _views(x, v61, cell=V61["cell"], n_masks=V61["n_masks"], ratio=0.5, dilate=0, stripes=False, crop=False,
+           corrupt="checker", noise_p=None, hw=None):
     """(원본 입력, 마스킹본 (n,B,1,H,W)). ver6.1~ 은 원본과 마스킹본이 각자 다른 회전을 받은 뒤 마스킹.
 
     dilate: ver7.3 — 회전 → 팽창 채널 추가 (B,2,H,W) → 두 채널에 같은 바둑판 마스킹
     stripes: ver7.7 — 마지막 2장을 바둑판 대신 세로줄 / 가로줄 (같은 칸 크기, 회전 후 마스킹)
              "all" — 모두 줄무늬 (세로, 가로 번갈아; ver7.X1 / 7.95 의 줄무늬 단계)
     crop: ver7.X — 마스킹본만 회전 → 무작위 크기 자르기 (ver3 의 crop, 면적 50~100%) → 마스킹, 원본은 그대로
+    corrupt: y9.1 — "checker" (기존 마스킹) / "none" (회전만, 망가뜨리지 않음) /
+             "noise" (회전 **전** die 단위 랜덤 불량 추가, 뷰 i 의 확률 = noise_p[i], hw = (B,2) 원본 die 격자)
     """
+    if corrupt == "none":
+        return A.rotate(x), torch.stack([A.rotate(x) for _ in range(n_masks)])
+    if corrupt == "noise":
+        assert len(noise_p) == n_masks and hw is not None
+        return A.rotate(x), torch.stack([A.rotate(A.die_noise(x, hw, p)) for p in noise_p])
     if not v61:
         return x, A.multi_mask(x, V6["n_masks"], V6["mask_area"])
     rot = (lambda v: A.add_dilated(A.rotate(v), dilate)) if dilate else A.rotate
@@ -108,7 +138,7 @@ def _views(x, v61, cell=V61["cell"], n_masks=V61["n_masks"], ratio=0.5, dilate=0
 
 def pretrain(ds, sub, args, device, out_path, v61=False, cell=V61["cell"], n_masks=V61["n_masks"], ratio=0.5, mlp=None,
              per_view=False, dilate=0, stripes=False, curriculum=None, lab_idx=None, triplet_w=0.0, crop=False, bn_groups=None,
-             size=None):
+             size=None, corrupt="checker", noise_p=None, proj=False, hw_table=None):
     """Phase 1. 온라인 인코더(state_dict, fc 제외)를 저장 — selfsup.finetune 이 그대로 읽음.
 
     cell: 바둑판 칸 크기 (ver6.1 = 12, ver6.2~ = 6), n_masks: 마스킹본 수 (ver6.3 = 3), ratio: 가리는 비율 (ver6.4 = 0.3)
@@ -120,12 +150,19 @@ def pretrain(ds, sub, args, device, out_path, v61=False, cell=V61["cell"], n_mas
     crop: 마스킹본만 무작위 크기 자르기 (ver7.X)
     bn_groups: 마스킹본의 BN 묶음 (_predict 참고, 치팅 검증용)
     size: 웨이퍼별 표준화 log(die 수) 표 — 주면 인코더가 FiLM 으로 크기 조건을 받음 (ver8.2)
+    corrupt / noise_p: 뷰를 망가뜨리는 방식 (_views 참고, y9.1). hw_table: (웨이퍼 수, 2) 원본 die 격자 — corrupt="noise" 일 때 필요
+    proj: BYOL 식 projector 추가 (y9.1). 저장되는 것은 지금처럼 인코더만
     """
     set_seed(args.seed)
     cfg = V61 if v61 else V6
-    assert size is None or not (triplet_w or bn_groups)
-    model = MaskedLatentModel(args.arch, mlp=v61 if mlp is None else mlp, size=size).to(device)
+    assert size is None or not (triplet_w or bn_groups or proj)
+    assert corrupt == "checker" or not (dilate or stripes or crop or curriculum)
+    model = MaskedLatentModel(args.arch, mlp=v61 if mlp is None else mlp, size=size, proj=proj).to(device)
     params = list(model.encoder.parameters()) + list(model.predictor.parameters())
+    if proj:
+        params += list(model.projector.parameters())
+    if corrupt == "noise":
+        hw_all = torch.as_tensor(np.asarray(hw_table)[:, :2], dtype=torch.long)
     opt = torch.optim.AdamW(params, lr=V3["ssl_lr"], weight_decay=1e-4)
     B = args.batch_size
     steps = len(sub) // B
@@ -148,7 +185,9 @@ def pretrain(ds, sub, args, device, out_path, v61=False, cell=V61["cell"], n_mas
         print(f"--- resume from {ckpt_path} (epoch {ck['ep']} done)", flush=True)
     for ep in range(start, args.ssl_epochs + 1):
         model.encoder.train(); model.predictor.train()
-        t, tot, zstd, tl = time.time(), 0.0, 0.0, 0.0
+        if proj:
+            model.projector.train()
+        t, tot, zstd, tl, vcos = time.time(), 0.0, 0.0, 0.0, 0.0
         if curriculum:
             first = ep <= args.ssl_epochs // 2
             stripes = "all" if first == (curriculum == "stripe_first") else False
@@ -156,14 +195,16 @@ def pretrain(ds, sub, args, device, out_path, v61=False, cell=V61["cell"], n_mas
         for s in range(steps):
             with torch.no_grad():
                 bi = np.sort(perm[s * B:(s + 1) * B])
-                x, xm = _views(ds.fetch(bi, device), v61, cell, n_masks, ratio, dilate, stripes, crop)
+                x, xm = _views(ds.fetch(bi, device), v61, cell, n_masks, ratio, dilate, stripes, crop,
+                               corrupt, noise_p, hw_all[bi] if corrupt == "noise" else None)
                 idx = torch.as_tensor(bi, device=device) if size is not None else None
                 if triplet_w:
                     j = lsampler(128)
                     xl = A.rotate(ds.fetch(lab_idx[j], device))
                     yl = torch.from_numpy(y_lab[j]).to(device)
+            st = {}
             with torch.autocast("cuda", dtype=torch.float16):
-                loss, z = consistency_loss(model, x, xm, per_view, bn_groups, idx)
+                loss, z = consistency_loss(model, x, xm, per_view, bn_groups, idx, stats=st)
                 if triplet_w:
                     Lt = batch_hard_triplet(model.encoder(to_input(xl)), yl)
                     loss = loss + triplet_w * Lt
@@ -175,8 +216,10 @@ def pretrain(ds, sub, args, device, out_path, v61=False, cell=V61["cell"], n_mas
             tot += loss.item()
             # 붕괴 감시: 정규화 벡터의 차원별 표준편차 평균 (건강 ≈ 1/sqrt(512) ≈ 0.044, 붕괴 → 0)
             zstd += F.normalize(z, dim=1).std(0).mean().item()
+            vcos = vcos + st["view_cos"].cpu()
         print(f"ssl epoch={ep} loss={tot / steps:.4f} z_std={zstd / steps:.4f} sec={time.time() - t:.1f}"
-              + (f" mask={stripes or 'checker'}" if curriculum else "") + (f" Lt={tl / steps:.4f}" if triplet_w else ""), flush=True)
+              + (f" mask={stripes or 'checker'}" if curriculum else "") + (f" Lt={tl / steps:.4f}" if triplet_w else "")
+              + " view_cos=" + "/".join(f"{c:.4f}" for c in (vcos / steps).tolist()), flush=True)
         torch.save(dict(ep=ep, model=model.state_dict(), opt=opt.state_dict(), sched=sched.state_dict(), scaler=scaler.state_dict(),
                         rng=rng.bit_generator.state, torch_rng=torch.get_rng_state(), cuda_rng=torch.cuda.get_rng_state(),
                         lsampler=lsampler if triplet_w else None), ckpt_path + ".tmp")

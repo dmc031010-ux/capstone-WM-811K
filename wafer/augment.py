@@ -85,6 +85,24 @@ def noise(x):
     return torch.where(flip, 3 - x, x)  # 1 <-> 2
 
 
+def die_noise(x, hw, p):
+    """y9.1: die 단위 랜덤 불량 추가 — 회전 **전** 캐시 지도 (B,1,S,S) 에 적용해야 die 경계가 맞음.
+
+    hw: (B,2) 원본 die 격자 (h, w). 캐시는 원본을 nearest 로 S×S 에 늘린 것이므로 픽셀 (y,x) 의 원본 die 는
+    (floor((y+.5)h/S), floor((x+.5)w/S)) — 같은 die 의 픽셀은 같은 난수를 받는다. h 또는 w > S 이면 픽셀마다 다른 die (픽셀 단위).
+    p: 정상 die (값 1) 를 불량 (값 2) 으로 바꿀 확률. 배경 (0) 과 기존 불량 (2) 은 그대로.
+    """
+    b, s = x.shape[0], x.shape[-1]
+    ar = torch.arange(s, device=x.device, dtype=torch.float32) + 0.5
+    hw = hw.to(x.device).float()
+    ri = (ar[None] * hw[:, :1] / s).long()                          # (B,S) 원본 행
+    ci = (ar[None] * hw[:, 1:] / s).long()                          # (B,S) 원본 열
+    hmax, wmax = int(hw[:, 0].max()), int(hw[:, 1].max())
+    u = torch.rand(b, hmax * wmax, device=x.device)                 # die 마다 난수 하나
+    u = u.gather(1, (ri[:, :, None] * wmax + ci[:, None, :]).flatten(1)).view(b, 1, s, s)
+    return torch.where((x == 1) & (u < p), torch.full_like(x, 2), x)
+
+
 def _cut(x, ys, xs, k):
     """ys, xs: (B, n_holes) 좌상단 좌표 → 해당 k x k 영역을 배경(0)으로."""
     h, w = x.shape[-2:]
