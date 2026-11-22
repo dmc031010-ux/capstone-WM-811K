@@ -20,7 +20,7 @@
   "epochs": 180,
   "weak": "rotate",
   "keep": false,
-  "method": "ver9",
+  "method": "y9",
   "switch_mask": null,
   "cosine": false,
   "ema": 0.0,
