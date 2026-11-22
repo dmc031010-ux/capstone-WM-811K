@@ -22,6 +22,7 @@ from sklearn.metrics import normalized_mutual_info_score
 from . import augment as A
 from .data import CLASSES, NUM_CLASSES
 from .engine import BalancedSampler, _Tracker, set_seed
+from . import models as wmodels
 from .models import ClassPool, FiLMFeatures, FiLMResNet, SizeHead, build_model, load_size, to_input
 
 V3 = dict(
@@ -184,7 +185,25 @@ def finetune(ds, lab_idx, sub, enc_path, args, out_dir, device):
         assert len(model.size) == len(ds.labels)
     model = model.to(device)
     missing = model.load_state_dict(torch.load(enc_path, map_location=device, weights_only=True), strict=False)
-    assert set(missing.missing_keys) == {"fc.weight", "fc.bias"}, missing
+    expected_missing = {"fc.weight", "fc.bias"}
+    actual_missing = set(missing.missing_keys)
+    sa_mode = getattr(wmodels, "USE_SA", False)
+    if sa_mode:
+        sa_prefixes = {
+            "layer3": ("layer3.sa.",),
+            "layer2": ("layer2.sa.",),
+            "ver9.7": ("layer3.sa.", "avgpool."),
+            "ver9.7_1step": ("layer3.sa.", "avgpool."),
+            "ver9.7_belief": ("layer3.sa.",),
+            "ver9.7_pool": ("avgpool.",),
+            "ver9.8": ("layer2.sa.", "layer3.sa.", "avgpool."),
+            "ver9.9": ("line_branch.", "line_scale", "layer3_sa.", "avgpool."),
+            "ver9.9A": ("line_branch.", "line_scale"),
+            "ver9.9B": ("line_branch.", "line_scale", "layer3_sa."),
+        }.get(sa_mode, ("avgpool.0.",))
+        assert actual_missing - expected_missing == {k for k in actual_missing if k.startswith(sa_prefixes)}, missing
+    else:
+        assert actual_missing == expected_missing, missing
     if args.size_head:  # ver8.1: 분류기 직전에 크기 임베딩 (die 수 → log → 표준화)
         assert args.v3_nopl and not args.triplet
         d = np.log(np.load(os.path.join(args.cache, "wm811k_shapes_dies.npy"))[:, 2].astype(np.float64))
@@ -197,15 +216,43 @@ def finetune(ds, lab_idx, sub, enc_path, args, out_dir, device):
     B = args.batch_size
     steps = math.ceil(len(lab_idx) / B)
     epochs = V3["ft_rounds"] * args.ft_epochs
+    attn_wd = getattr(args, "attn_wd", None)
     if args.class_pool:
         opt = torch.optim.AdamW([{"params": model.base.parameters()},
                                  {"params": [model.r], "lr": V3["ft_lr"] * 10, "weight_decay": 0.0}],
                                 lr=V3["ft_lr"], weight_decay=args.wd)
+    elif attn_wd is not None:
+        bb_decay, bb_no_decay, sa_decay, sa_no_decay = [], [], [], []
+        for name, param in model.named_parameters():
+            if not param.requires_grad:
+                continue
+            is_new = name.startswith(("layer3.sa.", "layer2.sa.", "layer3_sa.", "line_branch.", "line_scale", "avgpool.", "fc."))
+            no_decay = (param.ndim < 2) or name.endswith(".bias") or ("rel_pos_bias" in name) or ("pos_emb" in name)
+            if is_new:
+                (sa_no_decay if no_decay else sa_decay).append(param)
+            else:
+                (bb_no_decay if no_decay else bb_decay).append(param)
+        opt = torch.optim.AdamW([
+            {"params": bb_decay, "weight_decay": args.wd},
+            {"params": bb_no_decay, "weight_decay": 0.0},
+            {"params": sa_decay, "weight_decay": attn_wd},
+            {"params": sa_no_decay, "weight_decay": 0.0},
+        ], lr=V3["ft_lr"])
     else:
         opt = torch.optim.AdamW(model.parameters(), lr=V3["ft_lr"], weight_decay=args.wd)
-    # 미세조정 lr: --cosine 이면 lr*cos(7*pi*k/16K), 아니면 고정 (다른 방법들과 같은 조건)
-    sched = torch.optim.lr_scheduler.LambdaLR(
-        opt, (lambda k: math.cos(7 * math.pi * k / (16 * steps * epochs))) if args.cosine else (lambda k: 1.0))
+    # 미세조정 lr: warmup + cosine (ver9.7), --cosine 이면 lr*cos(7*pi*k/16K), 아니면 고정
+    total_steps = steps * epochs
+    warmup_steps = getattr(args, "warmup_epochs", 0) * steps
+    if warmup_steps > 0 and args.cosine:
+        def _lr_lambda(k):
+            if k < warmup_steps:
+                return 0.1 + 0.9 * (k / max(1, warmup_steps))
+            progress = (k - warmup_steps) / max(1, total_steps - warmup_steps)
+            return 0.05 + 0.95 * 0.5 * (1.0 + math.cos(math.pi * min(1.0, progress)))
+        sched = torch.optim.lr_scheduler.LambdaLR(opt, _lr_lambda)
+    else:
+        sched = torch.optim.lr_scheduler.LambdaLR(
+            opt, (lambda k: math.cos(7 * math.pi * k / (16 * total_steps))) if args.cosine else (lambda k: 1.0))
     scaler = torch.amp.GradScaler()
     lsampler = BalancedSampler(y_lab, args.seed, args.sample_pow)
     # ver7.8 / 7.81: none 클래스 손실 가중치만 낮춤, ver7.82 / 7.83: + Scratch 가중치 올림 (나머지 1.0), 모두 1.0 이면 일반 CE
@@ -213,8 +260,18 @@ def finetune(ds, lab_idx, sub, enc_path, args, out_dir, device):
     cw[CLASSES.index("none")] = args.none_w
     cw[CLASSES.index("Scratch")] = args.scratch_w
     tracker = _Tracker(out_dir, model, ds, device, args, dict(n_labeled=len(lab_idx), n_sub=len(sub), stage="ver3", v3=V3, rounds=[]))
+
+    class _FeatWrap(nn.Module):
+        def __init__(self, m):
+            super().__init__()
+            self.m = m
+
+        def forward(self, x):
+            return self.m.forward_features(x)
+
     feat_model = (model.base if args.size_head else FiLMFeatures(model) if args.film
                   else nn.Sequential(*list(model.base.children())[:-1], nn.Flatten()) if args.class_pool
+                  else _FeatWrap(model) if hasattr(model, "forward_features")
                   else nn.Sequential(*list(model.children())[:-1], nn.Flatten()))   # fc 앞 특징 (가중치 공유)
     ep = 0
     for r in range(V3["ft_rounds"]):
@@ -244,12 +301,21 @@ def finetune(ds, lab_idx, sub, enc_path, args, out_dir, device):
         for _ in range(args.ft_epochs):
             ep += 1
             model.train()
-            t, acc = time.time(), dict(Ls=0.0, Lc=0.0, **({"Lt": 0.0} if args.triplet else {}))
+            aux_w = getattr(args, "aux_belief_w", 0.0)
+            ls = getattr(args, "label_smoothing", 0.0)
+            grad_clip = getattr(args, "grad_clip", 0.0)
+            t, acc = time.time(), dict(
+                Ls=0.0, Lc=0.0,
+                **({"Lt": 0.0} if args.triplet else {}),
+                **({"La": 0.0} if aux_w > 0.0 else {}),
+            )
             for _ in range(steps):
                 li = lab_idx[lsampler(B)]
                 yl = torch.from_numpy(ds.labels[li]).to(device)
                 with torch.no_grad():
                     xl = A.weak(ds.fetch(li, device), "rotate")
+                    if getattr(args, "use_hflip", False):
+                        xl = A.hflip(xl)
                     if psampler:
                         j = psampler(args.mu * B // 2)
                         xp = A.strong(ds.fetch(p_idx[j], device), None, 0.0, keep=False, ops=_ops(args))
@@ -267,7 +333,7 @@ def finetune(ds, lab_idx, sub, enc_path, args, out_dir, device):
                     else:
                         logits = model(to_input(xin)).float()
                 Ls = focal_loss(logits[:B], yl, args.focal) if args.focal else \
-                    F.cross_entropy(logits[:B], yl, weight=cw if (cw != 1.0).any() else None)
+                    F.cross_entropy(logits[:B], yl, weight=cw if (cw != 1.0).any() else None, label_smoothing=ls)
                 if args.triplet:   # ver7.4: 같은 클래스는 당기고 다른 클래스(None 포함)는 밀기
                     Lt = batch_hard_triplet(feat[:B], yl)
                     acc["Lt"] += Lt.item()
@@ -278,8 +344,22 @@ def finetune(ds, lab_idx, sub, enc_path, args, out_dir, device):
                 loss = Ls + V3["lambda_c"] * Lc
                 if args.triplet:
                     loss = loss + args.triplet * Lt
+                if aux_w > 0.0:
+                    sa_mod = getattr(model, "layer3_sa", None) or getattr(model.layer3, "sa", None)
+                    step_logits = getattr(sa_mod, "last_step_logits", None)
+                    if step_logits:
+                        n_st = len(step_logits)
+                        w_sum = n_st * (n_st + 1) / 2.0
+                        La = sum(((i + 1) / w_sum) * F.cross_entropy(sl[:B], yl, weight=cw if (cw != 1.0).any() else None, label_smoothing=ls)
+                                 for i, sl in enumerate(step_logits))
+                        loss = loss + aux_w * La
+                        acc["La"] += La.item()
+                        sa_mod.last_step_logits = None
                 opt.zero_grad(set_to_none=True)
                 scaler.scale(loss).backward()
+                if grad_clip > 0.0:
+                    scaler.unscale_(opt)
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
                 scaler.step(opt); scaler.update(); sched.step()
                 acc["Ls"] += Ls.item(); acc["Lc"] += Lc.item()
             log = {k: v / steps for k, v in acc.items()}

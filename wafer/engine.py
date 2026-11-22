@@ -50,11 +50,17 @@ def evaluate(model, ds, idx, device, bs=1024):
     y_pred = torch.cat(preds).numpy()
     y_true = ds.labels[idx]
     labels = list(range(NUM_CLASSES))
+    cm = confusion_matrix(y_true, y_pred, labels=labels)
+    tp = np.diag(cm)
+    precision = np.divide(tp, cm.sum(0), out=np.zeros(NUM_CLASSES, dtype=float), where=cm.sum(0) != 0)
+    recall = np.divide(tp, cm.sum(1), out=np.zeros(NUM_CLASSES, dtype=float), where=cm.sum(1) != 0)
     return dict(
         macro_f1=float(f1_score(y_true, y_pred, labels=labels, average="macro", zero_division=0)),
         acc=float((y_true == y_pred).mean()),
         per_class_f1=dict(zip(CLASSES, f1_score(y_true, y_pred, labels=labels, average=None, zero_division=0).round(4).tolist())),
-        confusion=confusion_matrix(y_true, y_pred, labels=labels).tolist(),
+        per_class_precision=dict(zip(CLASSES, precision.round(4).tolist())),
+        per_class_recall=dict(zip(CLASSES, recall.round(4).tolist())),
+        confusion=cm.tolist(),
     )
 
 
@@ -67,7 +73,9 @@ class _Tracker:
 
     def step(self, epoch, train_log):
         val = evaluate(self.model, self.ds, self.ds.val, self.device)
-        rec = dict(epoch=epoch, val_macro_f1=val["macro_f1"], **train_log)
+        rec = dict(epoch=epoch, val_macro_f1=val["macro_f1"],
+                   val_scratch_precision=val["per_class_precision"]["Scratch"],
+                   val_scratch_recall=val["per_class_recall"]["Scratch"], **train_log)
         if val["macro_f1"] > self.best:
             self.best = val["macro_f1"]
             torch.save(self.model.state_dict(), os.path.join(self.out_dir, "best.pt"))
