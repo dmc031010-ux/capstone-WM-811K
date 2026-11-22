@@ -505,7 +505,7 @@ def build_model(arch, num_classes, in_ch=1):
                 in_dim=dim3, num_classes=num_classes, h=6, w=6, num_heads=4, num_steps=3, dropout=0.1
             ))
             m.avgpool = SpatialEvidencePooling(in_dim=m.fc.in_features, hidden_dim=128, dropout=0.1)
-        elif USE_SA in ("ver9.9", "ver9.9A", "ver9.9B"):
+        elif USE_SA in ("ver9.9", "ver9.9A", "ver9.9B", "ver9.9C"):
             dim3 = _layer_out_channels(m.layer3)
             m.line_branch = OrientedLineBranch(out_dim=dim3, dropout=0.1)
             m.line_scale = nn.Parameter(torch.tensor(0.05))
@@ -513,7 +513,7 @@ def build_model(arch, num_classes, in_ch=1):
                 m.layer3_sa = IterativeSpatialBeliefAttention(
                     in_dim=dim3, num_classes=num_classes, h=6, w=6, num_heads=4, num_steps=3, dropout=0.1
                 )
-            if USE_SA == "ver9.9":
+            if USE_SA in ("ver9.9", "ver9.9C"):
                 m.avgpool = SpatialEvidencePooling(in_dim=m.fc.in_features, hidden_dim=128, dropout=0.1)
 
             def _forward_features_v99(x):
