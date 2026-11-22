@@ -8,6 +8,14 @@
 > - **전체 실험 스토리 (문제 발견 → 원인 검증 → 해결책 → 결과)**: [EXPERIMENTS.md](EXPERIMENTS.md)
 > - **프로젝트 로드맵 & 진행 체크리스트 (Phase 1~6)**: [ROADMAP.md](ROADMAP.md)
 
+## 팀 협업 & 버전 네이밍 규칙
+
+- **브랜치 운영**: `main`은 확정 통합본만 유지하고, 각자 전용 브랜치(`feat/hanbandoche` 등)에서 개발 후 Pull Request로 병합합니다.
+- **실험 버전 네이밍**:
+  - `k9.xx` : Hanbandoche 개별 실험 버전
+  - `s9.xx` : 팀원(`dmc031010-ux`) 개별 실험 버전
+  - `ver9.xx` : `main` 브랜치에 채택·통합된 공식 버전
+
 ---
 
 ## 핵심 성과 요약
