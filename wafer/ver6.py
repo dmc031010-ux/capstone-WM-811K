@@ -105,13 +105,16 @@ class MaskedLatentModel(nn.Module):
         if size is not None:   # ver8.2: 인코더 (온라인 / 타깃 모두) 를 크기 조건 FiLM ResNet 으로
             self.encoder = FiLMResNet(self.encoder, size)
         if use_projector:
-            proj_hid, proj_out = 256, 128
+            if use_projector == "wide":
+                proj_hid, proj_out, pred_hid = 512, 256, 256
+            else:
+                proj_hid, proj_out, pred_hid = 256, 128, 256
             self.projector = nn.Sequential(
                 nn.Linear(dim, proj_hid), nn.BatchNorm1d(proj_hid), nn.ReLU(inplace=True), nn.Linear(proj_hid, proj_out)
             )
             self.target_projector = copy.deepcopy(self.projector).requires_grad_(False)
             self.predictor = nn.Sequential(
-                nn.Linear(proj_out, proj_hid), nn.BatchNorm1d(proj_hid), nn.ReLU(inplace=True), nn.Linear(proj_hid, proj_out)
+                nn.Linear(proj_out, pred_hid), nn.BatchNorm1d(pred_hid), nn.ReLU(inplace=True), nn.Linear(pred_hid, proj_out)
             )
             head_dim = proj_out
         else:

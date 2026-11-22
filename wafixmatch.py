@@ -79,7 +79,7 @@ def ssl_tag(args):
         tag = f"ver2{cut_tag(args)}"
     elif args.method == "ver3":
         tag = f"ver3_ssl{args.ssl_epochs}_ft{args.ft_epochs}"
-    elif args.method in ("ver3.2", "ver6", "ver6.1", "ver6.2", "ver6.3", "ver6.4", "ver6.5", "ver6.6", "ver7", "ver7.1", "ver7.2", "ver7.3", "ver7.4", "ver7.5", "ver7.6", "ver7.7", "ver7.8", "ver7.81", "ver7.82", "ver7.83", "ver7.9", "ver7.91", "ver7.92", "ver7.93", "ver7.X1", "ver7.95", "ver7.X2", "ver7.X", "ver8", "ver8.1", "ver8.2", "ver8.3", "ver9", "ver9.1A", "ver9.1B", "ver9.1C", "ver9.2A", "ver9.2B", "ver9.2C", "ver9.3", "ver9.3a0", "ver9.3a1", "ver9.3a2", "ver9.3a3", "ver9.3a4", "ver9.3a5", "ver9.3B", "ver9.4", "ver9.4w", "ver9.4_simclr", "ver9.4A", "ver9.4B", "ver9.4B1", "ver9.4B2", "ver9.4B3", "ver9.4B4", "ver9.4C", "ver9.5A", "ver9.5B", "ver9.5C", "ver9.5D", "ver9.5E", "ver9.5F"):
+    elif args.method in ("ver3.2", "ver3_B2", "ver6", "ver6.1", "ver6.2", "ver6.3", "ver6.4", "ver6.5", "ver6.6", "ver7", "ver7.1", "ver7.2", "ver7.3", "ver7.4", "ver7.5", "ver7.6", "ver7.7", "ver7.8", "ver7.81", "ver7.82", "ver7.83", "ver7.9", "ver7.91", "ver7.92", "ver7.93", "ver7.X1", "ver7.95", "ver7.X2", "ver7.X", "ver8", "ver8.1", "ver8.2", "ver8.3", "ver9", "ver9.1A", "ver9.1B", "ver9.1C", "ver9.2A", "ver9.2B", "ver9.2C", "ver9.3", "ver9.3a0", "ver9.3a1", "ver9.3a2", "ver9.3a3", "ver9.3a4", "ver9.3a5", "ver9.3B", "ver9.4", "ver9.4w", "ver9.4_simclr", "ver9.4A", "ver9.4B", "ver9.4B1", "ver9.4B2", "ver9.4B3", "ver9.4B4", "ver9.4C", "ver9.5A", "ver9.5B", "ver9.5C", "ver9.5D", "ver9.5E", "ver9.5F", "ver9.6A", "ver9.6A_B2", "ver9.6B", "ver9.6B_B2"):
         tag = f"{args.method}_ssl{args.ssl_epochs}_ft{args.ft_epochs}"
     elif args.method == "ver3.1":
         # ver3.1 → ver3_cut_..._pw 등 (기존 결과 폴더 이름 유지)
@@ -134,8 +134,8 @@ def run_one(args, ds, device):
         print(f"--- stage 2: skip (done {out})")
         return
     # ver3.1 / ver3.2 / ver6 는 ver3 의 캐시 폴더를 공유 (파일 이름으로 구분)
-    v9_ft_only = ("ver9.1A", "ver9.1B", "ver9.1C", "ver9.3", "ver9.3a0", "ver9.3a1", "ver9.3a2", "ver9.3a3", "ver9.3a4", "ver9.3a5", "ver9.3B", "ver9.4", "ver9.4w", "ver9.4_simclr", "ver9.4A", "ver9.4B", "ver9.4B1", "ver9.4B2", "ver9.4B3", "ver9.4B4", "ver9.4C")
-    v9_ssl = ("ver9", "ver9.2A", "ver9.2B", "ver9.2C", "ver9.5A", "ver9.5B", "ver9.5C", "ver9.5D", "ver9.5E", "ver9.5F")
+    v9_ft_only = ("ver3_B2", "ver9.1A", "ver9.1B", "ver9.1C", "ver9.3", "ver9.3a0", "ver9.3a1", "ver9.3a2", "ver9.3a3", "ver9.3a4", "ver9.3a5", "ver9.3B", "ver9.4", "ver9.4w", "ver9.4_simclr", "ver9.4A", "ver9.4B", "ver9.4B1", "ver9.4B2", "ver9.4B3", "ver9.4B4", "ver9.4C", "ver9.6A_B2", "ver9.6B_B2")
+    v9_ssl = ("ver9", "ver9.2A", "ver9.2B", "ver9.2C", "ver9.5A", "ver9.5B", "ver9.5C", "ver9.5D", "ver9.5E", "ver9.5F", "ver9.6A", "ver9.6B")
     v9_all = v9_ft_only + v9_ssl
     shared = ("ver3.1", "ver3.2", "ver6", "ver6.1", "ver6.2", "ver6.3", "ver6.4", "ver6.5", "ver6.6", "ver7", "ver7.1", "ver7.2", "ver7.3", "ver7.4", "ver7.5", "ver7.6", "ver7.7", "ver7.8", "ver7.81", "ver7.82", "ver7.83", "ver7.9", "ver7.91", "ver7.92", "ver7.93", "ver7.X1", "ver7.95", "ver7.X2", "ver7.X", "ver8", "ver8.1", "ver8.2", "ver8.3") + v9_all
     cache_base = os.path.join(args.cache, "ver3" if args.method in shared else args.method, os.path.relpath(base))
@@ -151,12 +151,12 @@ def run_one(args, ds, device):
             print(f"--- ver3 subset: {len(sub)} of {n_cand} unlabeled with fail ratio >= {r0}")
             np.save(sub_path, sub)
         sub = np.load(sub_path)
-        masklat_methods = ("ver6", "ver6.1", "ver6.2", "ver6.3", "ver6.4", "ver6.5", "ver6.6", "ver7", "ver7.1", "ver7.2", "ver7.3", "ver7.4", "ver7.5", "ver7.6", "ver7.7", "ver7.8", "ver7.81", "ver7.82", "ver7.83", "ver7.9", "ver7.91", "ver7.92", "ver7.93", "ver7.X1", "ver7.95", "ver7.X2", "ver7.X", "ver8", "ver8.1", "ver8.2", "ver8.3") + tuple(m for m in v9_all if m != "ver9.4_simclr")
+        masklat_methods = ("ver6", "ver6.1", "ver6.2", "ver6.3", "ver6.4", "ver6.5", "ver6.6", "ver7", "ver7.1", "ver7.2", "ver7.3", "ver7.4", "ver7.5", "ver7.6", "ver7.7", "ver7.8", "ver7.81", "ver7.82", "ver7.83", "ver7.9", "ver7.91", "ver7.92", "ver7.93", "ver7.X1", "ver7.95", "ver7.X2", "ver7.X", "ver8", "ver8.1", "ver8.2", "ver8.3") + tuple(m for m in v9_all if m not in ("ver9.4_simclr", "ver3_B2"))
         if args.method in masklat_methods:
-            suffix = {"ver6": "", "ver6.1": "61", "ver6.2": "62", "ver6.3": "63", "ver6.4": "64", "ver6.5": "65", "ver6.6": "66", "ver7": "7", "ver7.1": "71", "ver7.2": "72", "ver7.3": "73", "ver7.4": "7", "ver7.5": "7", "ver7.6": "7", "ver7.7": "77", "ver7.8": "7", "ver7.81": "7", "ver7.82": "7", "ver7.83": "7", "ver7.9": "7", "ver7.91": "7", "ver7.92": "77", "ver7.93": "7", "ver7.X1": "7X1", "ver7.95": "795", "ver7.X2": "7X2", "ver7.X": "7X", "ver8": "8", "ver8.1": "8", "ver8.2": "82", "ver8.3": "8", "ver9.2A": "92", "ver9.2B": "93", "ver9.2C": "94", "ver9.5A": "999", "ver9.5B": "9L1", "ver9.5C": "9L2", "ver9.5D": "9L3", "ver9.5E": "9L4", "ver9.5F": "9A1"}.get(args.method, "7")
+            suffix = {"ver6": "", "ver6.1": "61", "ver6.2": "62", "ver6.3": "63", "ver6.4": "64", "ver6.5": "65", "ver6.6": "66", "ver7": "7", "ver7.1": "71", "ver7.2": "72", "ver7.3": "73", "ver7.4": "7", "ver7.5": "7", "ver7.6": "7", "ver7.7": "77", "ver7.8": "7", "ver7.81": "7", "ver7.82": "7", "ver7.83": "7", "ver7.9": "7", "ver7.91": "7", "ver7.92": "77", "ver7.93": "7", "ver7.X1": "7X1", "ver7.95": "795", "ver7.X2": "7X2", "ver7.X": "7X", "ver8": "8", "ver8.1": "8", "ver8.2": "82", "ver8.3": "8", "ver9.2A": "92", "ver9.2B": "93", "ver9.2C": "94", "ver9.5A": "999", "ver9.5B": "9L1", "ver9.5C": "9L2", "ver9.5D": "9L3", "ver9.5E": "9L4", "ver9.5F": "9A1", "ver9.6A": "96A", "ver9.6A_B2": "96A", "ver9.6B": "96B", "ver9.6B_B2": "96B"}.get(args.method, "7")
             enc_path = os.path.join(cache_base, f"masklat{suffix}_e{args.ssl_epochs}.pt")
         else:
-            enc_name = "simclr_random" if args.method in ("ver3", "ver9.4_simclr") else "simclr"
+            enc_name = "simclr_random" if args.method in ("ver3", "ver9.4_simclr", "ver3_B2") else "simclr"
             enc_path = os.path.join(cache_base, f"{enc_name}{cut_tag(args)}{'_mc' if args.v3_multicrop else ''}_e{args.ssl_epochs}.pt")
         if not os.path.exists(enc_path):
             if args.method in v9_ft_only:
@@ -182,8 +182,8 @@ def run_one(args, ds, device):
                               view_attention=args.method == "ver9.2A",
                               view_gate_mode={"ver9.2B": "target_similarity", "ver9.2C": "target_conditioned"}.get(args.method),
                               flip=args.method == "ver9.5A",
-                              loss_mode={"ver9.5B": "infonce", "ver9.5C": "uniformity", "ver9.5D": "vicreg", "ver9.5E": "debiased_infonce"}.get(args.method),
-                              use_projector=args.method == "ver9.5F",
+                              loss_mode={"ver9.5B": "infonce", "ver9.6A": "infonce", "ver9.5C": "uniformity", "ver9.6B": "uniformity", "ver9.5D": "vicreg", "ver9.5E": "debiased_infonce"}.get(args.method),
+                              use_projector="wide" if args.method in ("ver9.6A", "ver9.6B") else (args.method == "ver9.5F"),
                               size=wmodels.load_size(args.cache) if args.film else None)
             else:
                 selfsup.pretrain(ds, sub, args, device, enc_path)
@@ -255,7 +255,7 @@ def main():
     p.add_argument("--weak", default="rotate", choices=["rotate", "flipshift"])
     p.add_argument("--no_keep", dest="keep", action="store_false", help="saliency 없이 일반 cutout")
     p.add_argument("--method", default="wafixmatch",
-                   choices=["wafixmatch", "fixmatch", "ver1", "ver1.1", "ver2", "ver3", "ver3.1", "ver3.2", "ver6", "ver6.1", "ver6.2", "ver6.3", "ver6.4", "ver6.5", "ver6.6", "ver7", "ver7.1", "ver7.2", "ver7.3", "ver7.4", "ver7.5", "ver7.6", "ver7.7", "ver7.8", "ver7.81", "ver7.82", "ver7.83", "ver7.9", "ver7.91", "ver7.92", "ver7.93", "ver7.X1", "ver7.95", "ver7.X2", "ver7.X", "ver8", "ver8.1", "ver8.2", "ver8.3", "ver9", "ver9.1A", "ver9.1B", "ver9.1C", "ver9.2A", "ver9.2B", "ver9.2C", "ver9.3", "ver9.3a0", "ver9.3a1", "ver9.3a2", "ver9.3a3", "ver9.3a4", "ver9.3a5", "ver9.3B", "ver9.4", "ver9.4w", "ver9.4_simclr", "ver9.4A", "ver9.4B", "ver9.4B1", "ver9.4B2", "ver9.4B3", "ver9.4B4", "ver9.4C", "ver9.5A", "ver9.5B", "ver9.5C", "ver9.5D", "ver9.5E", "ver9.5F"],
+                   choices=["wafixmatch", "fixmatch", "ver1", "ver1.1", "ver2", "ver3", "ver3.1", "ver3.2", "ver3_B2", "ver6", "ver6.1", "ver6.2", "ver6.3", "ver6.4", "ver6.5", "ver6.6", "ver7", "ver7.1", "ver7.2", "ver7.3", "ver7.4", "ver7.5", "ver7.6", "ver7.7", "ver7.8", "ver7.81", "ver7.82", "ver7.83", "ver7.9", "ver7.91", "ver7.92", "ver7.93", "ver7.X1", "ver7.95", "ver7.X2", "ver7.X", "ver8", "ver8.1", "ver8.2", "ver8.3", "ver9", "ver9.1A", "ver9.1B", "ver9.1C", "ver9.2A", "ver9.2B", "ver9.2C", "ver9.3", "ver9.3a0", "ver9.3a1", "ver9.3a2", "ver9.3a3", "ver9.3a4", "ver9.3a5", "ver9.3B", "ver9.4", "ver9.4w", "ver9.4_simclr", "ver9.4A", "ver9.4B", "ver9.4B1", "ver9.4B2", "ver9.4B3", "ver9.4B4", "ver9.4C", "ver9.5A", "ver9.5B", "ver9.5C", "ver9.5D", "ver9.5E", "ver9.5F", "ver9.6A", "ver9.6A_B2", "ver9.6B", "ver9.6B_B2"],
                    help="fixmatch: 표준 FixMatch 증강 (weak=flip+shift, strong=기하 RandAugment), saliency 없음. "
                         "ver1: weak=회전, strong=웨이퍼 5종(일반 cutout) + 채택률 기반 Ls 감쇠 (--switch_mask 없으면 감쇠 없는 기반). "
                         "ver1.1: ver1 + Ls <= --ls_start 일 때만 감쇠 시작, lambda_s 단조 감소 (--switch_mask 필수). "
@@ -319,7 +319,7 @@ def main():
         p.error("--v3_weight / --v3_nopl / --v3_multicrop / --v3_clusters 는 --method ver3.1 에서만 사용")
     if args.method == "ver3.2":
         args.no_cutout = True       # ver3.2 = 처음 버전 (cutout 없음)
-    v9_methods = ("ver9", "ver9.1A", "ver9.1B", "ver9.1C", "ver9.2A", "ver9.2B", "ver9.2C", "ver9.3", "ver9.3a0", "ver9.3a1", "ver9.3a2", "ver9.3a3", "ver9.3a4", "ver9.3a5", "ver9.3B", "ver9.4", "ver9.4w", "ver9.4_simclr", "ver9.4A", "ver9.4B", "ver9.4B1", "ver9.4B2", "ver9.4B3", "ver9.4B4", "ver9.4C", "ver9.5A", "ver9.5B", "ver9.5C", "ver9.5D", "ver9.5E", "ver9.5F")
+    v9_methods = ("ver3_B2", "ver9", "ver9.1A", "ver9.1B", "ver9.1C", "ver9.2A", "ver9.2B", "ver9.2C", "ver9.3", "ver9.3a0", "ver9.3a1", "ver9.3a2", "ver9.3a3", "ver9.3a4", "ver9.3a5", "ver9.3B", "ver9.4", "ver9.4w", "ver9.4_simclr", "ver9.4A", "ver9.4B", "ver9.4B1", "ver9.4B2", "ver9.4B3", "ver9.4B4", "ver9.4C", "ver9.5A", "ver9.5B", "ver9.5C", "ver9.5D", "ver9.5E", "ver9.5F", "ver9.6A", "ver9.6A_B2", "ver9.6B", "ver9.6B_B2")
     if args.method in ("ver3", "ver6", "ver6.1", "ver6.2", "ver6.3", "ver6.4", "ver6.5", "ver6.6", "ver7", "ver7.1", "ver7.2", "ver7.3", "ver7.4", "ver7.5", "ver7.6", "ver7.7", "ver7.8", "ver7.81", "ver7.82", "ver7.83", "ver7.9", "ver7.91", "ver7.92", "ver7.93", "ver7.X1", "ver7.95", "ver7.X2", "ver7.X", "ver8", "ver8.1", "ver8.2", "ver8.3") + v9_methods:
         args.v3_nopl = True         # 군집 pseudo-label 없음 (labeled 로만 미세조정)
     if args.method == "ver1.1" and args.switch_mask is None:
@@ -344,7 +344,7 @@ def main():
         wmodels.USE_SA = "ver9.7_1step"
     elif args.method == "ver9.3B":
         wmodels.USE_SA = "ver9.8"
-    elif args.method in ("ver9.4", "ver9.4w", "ver9.4_simclr", "ver9.4B2"):
+    elif args.method in ("ver9.4", "ver9.4w", "ver9.4_simclr", "ver9.4B2", "ver9.6A_B2", "ver9.6B_B2", "ver3_B2"):
         wmodels.USE_SA = "ver9.9"
     elif args.method == "ver9.4A":
         wmodels.USE_SA = "ver9.9A"
@@ -376,8 +376,8 @@ def main():
     args.label_smoothing = 0.05 if recipe_on else 0.0
     args.attn_wd = 0.02 if recipe_on else None
     args.warmup_epochs = 5 if (args.method in v93_family or args.method == "ver9.4B3") else 0
-    args.grad_clip = 1.0 if (args.method in v93_family or args.method in ("ver9.4B", "ver9.4B1", "ver9.4B2", "ver9.4B3", "ver9.4B4")) else 0.0
-    args.aux_belief_w = 0.3 if args.method in ("ver9.3", "ver9.3a2", "ver9.3a3", "ver9.3a4", "ver9.3a5", "ver9.3B", "ver9.4", "ver9.4w", "ver9.4_simclr", "ver9.4B", "ver9.4B1", "ver9.4B2", "ver9.4B3", "ver9.4B4") else 0.0
+    args.grad_clip = 1.0 if (args.method in v93_family or args.method in ("ver9.4B", "ver9.4B1", "ver9.4B2", "ver9.4B3", "ver9.4B4", "ver9.6A_B2", "ver9.6B_B2", "ver3_B2")) else 0.0
+    args.aux_belief_w = 0.3 if args.method in ("ver9.3", "ver9.3a2", "ver9.3a3", "ver9.3a4", "ver9.3a5", "ver9.3B", "ver9.4", "ver9.4w", "ver9.4_simclr", "ver9.4B", "ver9.4B1", "ver9.4B2", "ver9.4B3", "ver9.4B4", "ver9.6A_B2", "ver9.6B_B2", "ver3_B2") else 0.0
     args.use_hflip = args.method in ("ver9.4", "ver9.4w", "ver9.4_simclr", "ver9.4B4")
     if args.method in v93_family or args.method == "ver9.4B3":
         args.cosine = True

@@ -58,12 +58,12 @@ flowchart LR
 ### Phase 5. 사전학습 표현력 고도화 — SimCLR(`0.8674`) 돌파 🔄
 - [x] 공정 대조 실험 (`ver9.4_simclr` SimCLR `0.8674` vs `ver9.4` `0.8526`): **`Scratch` 우리 우위(`+1.92%p`)**, `Donut/Loc/Center` 열세 원인(Projector·반발력 부재) 특정
 - [x] 단일 변경 통제 실험 1차 완료: `ver9.5A` (`hflip`: `0.8099`), `ver9.5B` (Masked InfoNCE: `0.8168`), `ver9.5C` (Uniformity: `0.8240`)
-- [ ] 단일 변경 통제 실험 2차 완료 *(실행 중)*: `ver9.5D` (VICReg), `ver9.5E` (Debiased InfoNCE), `ver9.5F` (경량 `Projector + Predictor`, `231K`)
-- [ ] 최적 사전학습 결합 모델 설계 및 50 epoch 체크포인트 생성 *(후보: `A1 경량 Projector` + 최적 반발력 + 다중 스케일 바둑판 `4/6/12px` + EMA Cosine/Warmup)*
+- [x] 단일 변경 통제 실험 2차 완료: `ver9.5D` (VICReg: `0.8175`), `ver9.5E` (Debiased InfoNCE: `0.8115`, Scratch `0.4878`), `ver9.5F` (경량 Projector `231K`: `0.8165`, Loc `0.7275`)
+- [ ] 반발력 + Projector 결합 실험 (`ver9.6A` Masked InfoNCE+Proj, `ver9.6B` Uniformity+Proj — 순정 FT & `ver9.4B2` 3모듈 FT, `ver3_B2` 대조) *(야간 실행 중)*
 - [ ] 신규 사전학습 체크포인트 + `ver9.4` 파인튜닝으로 **`ver9.4_simclr` (`0.8674`) 정면 돌파 확인**
 
 ### Phase 6. 최종 검증 및 리포트 완성 📋
-- [ ] 남은 구조 ablation 1종 완료: **`Line + Pool`** (`ver9.4B2`에서 `Belief`만 제거) → 3각 시너지 최종 확정
+- [x] 남은 구조 ablation 1종 완료: **`ver9.4C` (`Line + Pool`, `Belief` 제거: `0.8274`, Scratch `0.5263`)** + **`ver9.4B2` 2-seed 검증 (`0.8468 ± 0.0011`)** → 3각 시너지 최종 확정!
 - [ ] 최종 승자 모델 **Multi-seed (`seed 0, 1, 2`)** 평균·표준편차 보고
 - [ ] **라벨 비율 확장 실험 (`frac = 1%, 5%, 10%`)**: 극소량 라벨 환경에서의 강건성 입증
 - [ ] 최종 혼동행렬·클래스별 비교표·아키텍처 도식화 완성 및 최종 리포트 정리
