@@ -29,9 +29,9 @@
 | `wafixmatch` | 웨이퍼 특화 FixMatch 재현 | `0.7950` | `0.4646` | seed 0 |
 | `ver3` (SimCLR) | 10만 장 SimCLR + 라벨 미세조정 | `0.8391` | `0.6161` | SSL 기준선 (seed 0) |
 | **`ver7` (레퍼런스)** | **디코더 없는 6px 4뷰 바둑판 잠재 마스킹 SSL** | `0.8074 ± 0.0239` | `0.4601` | 2-seed 평균 (`seed0: 0.8314`) |
-| **`ver9.9B2`** | `ver7` 인코더 + 순수 구조 3종 (`Line + Belief + Pool`) | `0.8479` | `0.6569` | 순정 학습 그대로 `+1.65%p` |
-| **`ver9.91`** | **`ver7` 인코더 + 구조 3종 + 안정화 레시피** | **`0.8527 ± 0.0001`** | **`0.6777 ± 0.0000`** | **2-seed 평균, 전 9개 클래스 상승** |
-| `ver3.991` *(대조군)* | SimCLR 인코더 + `ver9.91` 파인튜닝 | `0.8674` | `0.6585` | `Scratch`는 `ver9.91` 우위 (`+1.92%p`) |
+| **`ver9.4B2`** | `ver7` 인코더 + 순수 구조 3종 (`Line + Belief + Pool`) | `0.8479` | `0.6569` | 순정 학습 그대로 `+1.65%p` |
+| **`ver9.4`** | **`ver7` 인코더 + 구조 3종 + 안정화 레시피** | **`0.8527 ± 0.0001`** | **`0.6777 ± 0.0000`** | **2-seed 평균, 전 9개 클래스 상승** |
+| `ver9.4_simclr` *(대조군)* | SimCLR 인코더 + `ver9.4` 파인튜닝 | `0.8674` | `0.6585` | `Scratch`는 `ver9.4` 우위 (`+1.92%p`) |
 
 ![WM-811K 9-class examples](results/class_examples.png)
 
@@ -42,11 +42,11 @@
 ### 1. 사전학습 — Latent Multi-Masking Ensemble Consistency (`ver7`)
 - **동기**: 픽셀 복원(MAE)은 웨이퍼의 90%+인 배경/정상 die 복원에 용량을 낭비하고, SimCLR의 `crop/cutout/shift`는 웨이퍼 결함의 위치(`Center`/`Edge-Loc`)와 선 연결성(`Scratch`)을 왜곡할 수 있음.
 - **구조**: 디코더 없이 **EMA 원본 타겟 `z`** 와 **6px 50% 바둑판 마스킹 + 독립 회전이 적용된 4개 뷰 예측 평균 `mean(p_i)`** 간의 잠재 공간 일관성 학습.
-- **사전학습 고도화 (Stage 5)**: `ver9L1~L4` (InfoNCE / Uniformity / VICReg / Debiased InfoNCE), `ver9A1` (경량 `Projector + Predictor`, 헤드 `526K → 231K`)로 `Donut / Center / Loc` 분리력 강화 검증 중.
+- **사전학습 고도화 (Stage 5)**: `ver9.5B~E` (InfoNCE / Uniformity / VICReg / Debiased InfoNCE), `ver9.5F` (경량 `Projector + Predictor`, 헤드 `526K → 231K`)로 `Donut / Center / Loc` 분리력 강화 검증 중.
 
 ![Checkerboard masking examples](results/mask_examples.png)
 
-### 2. 파인튜닝 — 웨이퍼 특화 3모듈 + 안정화 레시피 (`ver9.91`)
+### 2. 파인튜닝 — 웨이퍼 특화 3모듈 + 안정화 레시피 (`ver9.4`)
 - **`OrientedLineBranch`** (`wafer/models.py`): 원본 `96×96` anomaly 맵에 8방향 다중 스케일(`9×9`, `15×15`) 선형 필터 + 방향성 이방성(`max - mean`) + `MaxPool`만 사용해 1~2px `Scratch` 선 소실 방지.
 - **`IterativeSpatialBeliefAttention`** (3-step, `layer3`): `6×6` 공간 토큰에 2D 상대위치 바이어스 + 9클래스 Belief를 3회 반복 추론해 끊어진 선과 위치 맥락 파악.
 - **`SpatialEvidencePooling`**: 0-초기화 Gated Attention 풀링으로 `layer4(3×3)`에서 결함 칸에 집중하고 정상 웨이퍼에서는 균등 평균 유지 (`none → Scratch` 오탐 88% 감소).
@@ -95,8 +95,8 @@ python wafixmatch.py prepare --cache ./wafer_cache
 # 기준선 및 주요 모델 실행
 python wafixmatch.py run --frac 0.05 --method ver3 --seed 0 --cache ./wafer_cache
 python wafixmatch.py run --frac 0.05 --method ver7 --seed 0 --cache ./wafer_cache
-python wafixmatch.py run --frac 0.05 --method ver9.91 --seed 0 --cache ./wafer_cache
-python wafixmatch.py run --frac 0.05 --method ver9.9B2 --seed 0 --cache ./wafer_cache
+python wafixmatch.py run --frac 0.05 --method ver9.4 --seed 0 --cache ./wafer_cache
+python wafixmatch.py run --frac 0.05 --method ver9.4B2 --seed 0 --cache ./wafer_cache
 
 # 전체 결과표 출력
 python wafixmatch.py summary

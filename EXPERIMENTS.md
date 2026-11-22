@@ -11,9 +11,9 @@
 flowchart TD
     P1["Stage 1. 준지도 학습(FixMatch/WaFixMatch)의 한계<br/>Supervised 0.800 / WaFixMatch 0.795 / ver1~2 0.76~0.79"]
     -->|"검증: 채택 PL의 86~88%가 none(오탐 누적)<br/>→ PL 포기, 10만 장 자기지도(SSL) 전환"| P2["Stage 2. 자기지도(SimCLR) 돌파 & 독창적 마스킹 제안<br/>ver3(SimCLR) 0.839 → ver6 0.786 → ver7(6px 4뷰) 0.831"]
-    P2 -->|"검증: 왜 Scratch만 약한가?<br/>리사이즈(기각)·소형 die 웨이퍼(31% vs 44%)·<br/>과도한 1:1 균형샘플링·seed 변동성(±0.024) 확인"| P3["Stage 3. 원인별 가설 검증 (ver7.1~7.X2, ver9.2~9.4)<br/>부분 균형 샘플링(ver7.91: 0.837) 유효 확인<br/>단순 손실 가중치·팽창·뷰 게이트 기각"]
-    P3 -->|"해결: 얇은 선 보존(Line) + 전역 추론(3-step Belief)<br/>+ 증거 집중 풀링(EvidencePool) + 안정화 레시피"| P4["Stage 4. 파인튜닝 구조 혁신 (ver9.1 → ver9.91)<br/>2-seed 0.8074±0.0239 → 0.8527±0.0001<br/>Scratch 0.4601 → 0.6777 (+21.8%p), 전 클래스 상승"]
-    P4 -->|"공정 대조: ver3.991(SimCLR) 0.8674 vs ver9.91 0.8526<br/>Scratch는 우리 승(+1.9%p), Donut/Loc 열세<br/>→ 원인: Projector 부재 + 밀어내는 힘(Repulsion) 부재"| P5["Stage 5. 사전학습 표현력 고도화 (진행 중)<br/>ver999(hflip), ver9L1~L4(반발력), ver9A1(경량 Projector)"]
+    P2 -->|"검증: 왜 Scratch만 약한가?<br/>리사이즈(기각)·소형 die 웨이퍼(31% vs 44%)·<br/>과도한 1:1 균형샘플링·seed 변동성(±0.024) 확인"| P3["Stage 3. 원인별 가설 검증 (ver7.1~7.X2, ver9.2A~C)<br/>부분 균형 샘플링(ver7.91: 0.837) 유효 확인<br/>단순 손실 가중치·팽창·뷰 게이트 기각"]
+    P3 -->|"해결: 얇은 선 보존(Line) + 전역 추론(3-step Belief)<br/>+ 증거 집중 풀링(EvidencePool) + 안정화 레시피"| P4["Stage 4. 파인튜닝 구조 혁신 (ver9.1 → ver9.4)<br/>2-seed 0.8074±0.0239 → 0.8527±0.0001<br/>Scratch 0.4601 → 0.6777 (+21.8%p), 전 클래스 상승"]
+    P4 -->|"공정 대조: ver9.4_simclr(SimCLR) 0.8674 vs ver9.4 0.8526<br/>Scratch는 우리 승(+1.9%p), Donut/Loc 열세<br/>→ 원인: Projector 부재 + 밀어내는 힘(Repulsion) 부재"| P5["Stage 5. 사전학습 표현력 고도화 (진행 중)<br/>ver9.5A(hflip), ver9.5B~E(반발력), ver9.5F(경량 Projector)"]
 ```
 
 ---
@@ -80,7 +80,7 @@ flowchart TD
   - 줄무늬 마스킹 **`ver7.7`** 은 Scratch가 `0.5364`로 상승했으나 커리큘럼(`ver7.X1: 0.8216`)에서 유지되지 못함.
 
 ### 가설 3. "사전학습 4뷰를 단순 평균 대신 어텐션/게이트로 똑똑하게 합치면?" → **기각**
-- **검증 (`ver9.2` Inter-View SA `0.8296`, `ver9.3` Similarity Gate `0.8148`, `ver9.4` Conditioned Gate `0.8165`)**: 가중치 게이트를 두면 쉬운 뷰 1장에 가중치가 쏠리는 **편식(winner-take-all)** 이 발생해 단순 평균(`ver7`)보다 하락.
+- **검증 (`ver9.2A` Inter-View SA `0.8296`, `ver9.2B` Similarity Gate `0.8148`, `ver9.2C` Conditioned Gate `0.8165`)**: 가중치 게이트를 두면 쉬운 뷰 1장에 가중치가 쏠리는 **편식(winner-take-all)** 이 발생해 단순 평균(`ver7`)보다 하락.
 
 ### 가설 4. "파인튜닝 손실(Triplet / Focal / 클래스 가중치)로 불균형을 잡으면?" → **손실 조작은 기각, 샘플링 완화는 채택!**
 - **검증**:
@@ -94,16 +94,16 @@ flowchart TD
 
 ---
 
-## Stage 4. 돌파구: 웨이퍼 특화 파인튜닝 아키텍처 & 안정화 레시피 (`ver9.1` → `ver9.91`)
+## Stage 4. 돌파구: 웨이퍼 특화 파인튜닝 아키텍처 & 안정화 레시피 (`ver9.1` → `ver9.4`)
 
 Stage 3의 진단으로 **"입력에는 선이 살아 있는데 ResNet-18 파인튜닝 구조가 이를 지우고 희석하며, 1:1 샘플링과 고정 LR이 오탐·불안정을 키운다"** 는 4가지 구조적 병목이 명확해졌습니다. **`ver7` 인코더(`masklat7_e50.pt`)를 100% 그대로 둔 채** 4가지 병목을 하나씩 해결했습니다.
 
 | 발견된 병목 | 도입한 해결책 | 적용 버전 | 실제 효과 |
 |---|---|---|---|
-| **① ResNet 초반 stride-2에서 1~2px `Scratch` 선 소실** | **`OrientedLineBranch`**: 96×96 anomaly 맵에 8방향 다중스케일(`9×9`, `15×15`) 선 필터 + 방향성 이방성(`max - mean`) + `MaxPool` 전용 스트림 | `ver9.9` → **`ver9.91`** | `Scratch` 정답 `58.5 → 82.0/120`, 미탐(`S→none`) `-45%` |
-| **② 좁은 수용영역으로 끊어진 선·전역 위치 맥락 부족** | **`IterativeSpatialBeliefAttention`**: `layer3(6×6)`에서 2D 상대위치 바이어스 + 9클래스 Belief를 3-step 반복 추론 (`ver9.1A/B/C`로 `layer3` 최적 위치 먼저 검증) | `ver9.7` → **`ver9.91`** | `S→Loc` 혼동 `-33%`, `Loc +4.8%p`, `Edge-Loc +4.5%p` |
-| **③ `layer4(3×3)` `AvgPool`이 1~2칸 소형 결함을 정상 8칸에 희석** | **`SpatialEvidencePooling`**: 0-초기화 Gated Attention 풀링으로 결함 칸에만 집중, 정상 웨이퍼는 균등 평균 유지 | `ver9.7`, `ver9.9B2`, **`ver9.91`** | `ver9.9B→B2`에서 `none→Scratch` 오탐 **`102 → 12건`(-88%)** |
-| **④ 1:1 샘플링 오탐 + 5% 라벨 과적합 + 회전만 증강** | **`sample_pow=0.35` + Label Smoothing(0.05) + `attn_wd=0.02` + Warmup/Cosine + `hflip`** | `ver9.7` → **`ver9.91`** | `none→defect` 오탐 절반 이하, **2-seed 편차 `±0.0239 → ±0.0001`** |
+| **① ResNet 초반 stride-2에서 1~2px `Scratch` 선 소실** | **`OrientedLineBranch`**: 96×96 anomaly 맵에 8방향 다중스케일(`9×9`, `15×15`) 선 필터 + 방향성 이방성(`max - mean`) + `MaxPool` 전용 스트림 | `ver9.4w` → **`ver9.4`** | `Scratch` 정답 `58.5 → 82.0/120`, 미탐(`S→none`) `-45%` |
+| **② 좁은 수용영역으로 끊어진 선·전역 위치 맥락 부족** | **`IterativeSpatialBeliefAttention`**: `layer3(6×6)`에서 2D 상대위치 바이어스 + 9클래스 Belief를 3-step 반복 추론 (`ver9.1A/B/C`로 `layer3` 최적 위치 먼저 검증) | `ver9.3` → **`ver9.4`** | `S→Loc` 혼동 `-33%`, `Loc +4.8%p`, `Edge-Loc +4.5%p` |
+| **③ `layer4(3×3)` `AvgPool`이 1~2칸 소형 결함을 정상 8칸에 희석** | **`SpatialEvidencePooling`**: 0-초기화 Gated Attention 풀링으로 결함 칸에만 집중, 정상 웨이퍼는 균등 평균 유지 | `ver9.3`, `ver9.4B2`, **`ver9.4`** | `ver9.4B→B2`에서 `none→Scratch` 오탐 **`102 → 12건`(-88%)** |
+| **④ 1:1 샘플링 오탐 + 5% 라벨 과적합 + 회전만 증강** | **`sample_pow=0.35` + Label Smoothing(0.05) + `attn_wd=0.02` + Warmup/Cosine + `hflip`** | `ver9.3` → **`ver9.4`** | `none→defect` 오탐 절반 이하, **2-seed 편차 `±0.0239 → ±0.0001`** |
 
 ### 단계별 성능 도약 및 시너지 검증 결과
 
@@ -111,18 +111,18 @@ Stage 3의 진단으로 **"입력에는 선이 살아 있는데 ResNet-18 파인
 |---|---|---:|---:|---|
 | `ver7` (레퍼런스) | 기본 ResNet-18 + AvgPool + 1:1 샘플링 | `0.8074 ± 0.0239` *(2-seed)* | `0.4601` | 기준선 |
 | `ver9.1A / 9.1B / 9.1C` | 단순 Spatial SA 위치 비교 (`layer4` / `3` / `2`) | `0.825` / `0.829` / `0.818` | `0.472` / `0.496` / `0.474` | `layer3` (`ver9.1B`) 최적 확정 |
-| `ver9.7` | `3-step Belief + EvidencePool + 레시피` | `0.8395 ± 0.0016` *(2-seed)* | `0.5484` | `a0~a5` 6종 ablation으로 전 요소 기여 입증 |
-| `ver9.8` | `ver9.7` + `layer2(12×12)` RelSpatialAttention | `0.8331 ± 0.0074` *(2-seed)* | `0.4688` | 기각 (`layer2` 과적합) |
-| `ver9.9A` / `9.9B` | `Line+pow` / `Line+Belief` (최소 조합 탐색) | `0.8285` / `0.8351` *(seed 0)* | `0.4809` / `0.5477` | 단독 캐리 없음 확인 |
-| **`ver9.9B2`** | **`Line + 3-step Belief + EvidencePool` (순정 학습 100%)** | **`0.8479`** *(seed 0)* | **`0.6569`** | **순수 구조 3각 시너지 입증** |
-| **`ver9.91`** | **`ver9.9B2` + 레시피(`pow=0.35`, LS/WD/Cos, `hflip`)** | **`0.8527 ± 0.0001`** *(2-seed)* | **`0.6777 ± 0.0000`** | **전 9개 클래스 동반 상승 (`+4.53%p`)** |
+| `ver9.3` | `3-step Belief + EvidencePool + 레시피` | `0.8395 ± 0.0016` *(2-seed)* | `0.5484` | `a0~a5` 6종 ablation으로 전 요소 기여 입증 |
+| `ver9.3B` | `ver9.3` + `layer2(12×12)` RelSpatialAttention | `0.8331 ± 0.0074` *(2-seed)* | `0.4688` | 기각 (`layer2` 과적합) |
+| `ver9.4A` / `9.9B` | `Line+pow` / `Line+Belief` (최소 조합 탐색) | `0.8285` / `0.8351` *(seed 0)* | `0.4809` / `0.5477` | 단독 캐리 없음 확인 |
+| **`ver9.4B2`** | **`Line + 3-step Belief + EvidencePool` (순정 학습 100%)** | **`0.8479`** *(seed 0)* | **`0.6569`** | **순수 구조 3각 시너지 입증** |
+| **`ver9.4`** | **`ver9.4B2` + 레시피(`pow=0.35`, LS/WD/Cos, `hflip`)** | **`0.8527 ± 0.0001`** *(2-seed)* | **`0.6777 ± 0.0000`** | **전 9개 클래스 동반 상승 (`+4.53%p`)** |
 
 ---
 
-## Stage 5. 최종 관문: "우리 마스킹 사전학습이 정말 SimCLR을 이기는가?" (`ver3.991` vs `ver9.91` → `ver9L1~A1`)
+## Stage 5. 최종 관문: "우리 마스킹 사전학습이 정말 SimCLR을 이기는가?" (`ver9.4_simclr` vs `ver9.4` → `ver9.5B~F`)
 
-### 1) 공정 대조 실험에서 드러난 새로운 문제 (`ver3.991` vs `ver9.91`, `seed 0`)
-같은 `ver9.91` 파인튜닝을 SimCLR 인코더(`ver3.991`)와 우리 `ver7` 인코더(`ver9.91`)에 동일하게 붙여 비교한 결과:
+### 1) 공정 대조 실험에서 드러난 새로운 문제 (`ver9.4_simclr` vs `ver9.4`, `seed 0`)
+같은 `ver9.4` 파인튜닝을 SimCLR 인코더(`ver9.4_simclr`)와 우리 `ver7` 인코더(`ver9.4`)에 동일하게 붙여 비교한 결과:
 - **`Scratch`**: **우리 마스킹(`0.6777`) > SimCLR(`0.6585`) (`+1.92%p` 우리 승!)** → 바둑판 마스킹의 얇은 선 보존 강점 입증.
 - **전체 Macro F1**: 우리(`0.8526`) < SimCLR(`0.8674`) (`-1.48%p`).
 - **격차 발생 클래스**: `Donut (-5.97%p)`, `Near-full (-3.69%p)`, `Loc (-2.72%p)`, `Center (-1.95%p)`.
@@ -130,7 +130,7 @@ Stage 3의 진단으로 **"입력에는 선이 살아 있는데 ResNet-18 파인
 ### 2) 원인 진단
 1. **밀어내는 힘(Repulsion) 부재**: `ver7`은 같은 웨이퍼만 당기는(`1 - cos`) 구조라, 85%가 정상(`none`)인 데이터에서 비슷하게 생긴 덩어리 결함(`Donut` ↔ `Center` ↔ `Loc`)을 임베딩 공간에서 충분히 떼어놓지 못함.
 2. **Projector(표현 보호 방패) 부재**: `ver3`(SimCLR)에는 `Projector(512→512→128)`가 있어 불변성 압력을 흡수한 뒤 버리지만, `ver7`은 인코더 512차원 출력에 직접 손실을 걸어 세밀한 변별 정보가 손실됨.
-   - 실제로 방패·반발력 없이 사전학습에 `hflip`만 추가한 **`ver999`** 는 `z_std`가 `0.0296 → 0.0256`으로 줄며 `0.8099`로 오히려 하락.
+   - 실제로 방패·반발력 없이 사전학습에 `hflip`만 추가한 **`ver9.5A`** 는 `z_std`가 `0.0296 → 0.0256`으로 줄며 `0.8099`로 오히려 하락.
 
 ### 3) 현재 진행 중인 통제 검증 (파라미터 동결·축소 조건, `seed 0`, 순정 파인튜닝)
 
@@ -138,12 +138,12 @@ Stage 3의 진단으로 **"입력에는 선이 살아 있는데 ResNet-18 파인
 |---|---|---:|---:|---:|---:|---|
 | `ver3` (SimCLR) | 대조학습 기준선 (`Projector` 포함) | `328K` | `0.8391` | `0.6161` | `0.8214` | 완료 |
 | `ver7` (레퍼런스) | 6px 4뷰 바둑판 + `rotate` + `1 - cos` | `526K` | `0.8314` | `0.4766` | `0.8718` | 완료 |
-| `ver999` | 사전학습 `hflip` 추가 | `526K` | `0.8099` | `0.4232` | `0.8522` | 완료 |
-| `ver9L1` | **L1**: Masked InfoNCE (`tau=0.2`, EMA 유지) | `526K` | `0.8168` | `0.4281` | `0.8448` | 완료 (Projector 없는 InfoNCE 한계 확인) |
-| `ver9L2` | **L2**: `1 - cos` + Uniformity 반발력 (`0.1`) | `526K` | `0.8240` | `0.4412` | `0.8624` | 완료 |
-| `ver9L3` | **L3**: `1 - cos` + VICReg (`Var + Cov`) | `526K` | *(진행 중)* | - | - | 실행 중 |
-| `ver9L4` | **L4**: Debiased Masked InfoNCE | `526K` | *(대기)* | - | - | 대기 |
-| `ver9A1` | **A1**: 경량 `Projector(512→256→128) + Predictor` | **`231K`** *(절반 이하)* | *(대기)* | - | - | 대기 |
+| `ver9.5A` | 사전학습 `hflip` 추가 | `526K` | `0.8099` | `0.4232` | `0.8522` | 완료 |
+| `ver9.5B` | **L1**: Masked InfoNCE (`tau=0.2`, EMA 유지) | `526K` | `0.8168` | `0.4281` | `0.8448` | 완료 (Projector 없는 InfoNCE 한계 확인) |
+| `ver9.5C` | **L2**: `1 - cos` + Uniformity 반발력 (`0.1`) | `526K` | `0.8240` | `0.4412` | `0.8624` | 완료 |
+| `ver9.5D` | **L3**: `1 - cos` + VICReg (`Var + Cov`) | `526K` | `0.8175` | `0.4229` | `0.7736` | 완료 |
+| `ver9.5E` | **L4**: Debiased Masked InfoNCE | `526K` | *(실행 중)* | - | - | 실행 중 |
+| `ver9.5F` | **A1**: 경량 `Projector(512→256→128) + Predictor` | **`231K`** *(절반 이하)* | *(대기)* | - | - | 대기 |
 
 ---
 
@@ -156,8 +156,8 @@ python wafixmatch.py prepare
 # 2. 주요 단계별 재현
 python wafixmatch.py run --frac 0.05 --method ver3 --seed 0      # SimCLR 기준선
 python wafixmatch.py run --frac 0.05 --method ver7 --seed 0      # 우리 마스킹 레퍼런스
-python wafixmatch.py run --frac 0.05 --method ver9.91 --seed 0   # 파인튜닝 구조 혁신 (최고 성능)
-python wafixmatch.py run --frac 0.05 --method ver9.9B2 --seed 0  # 순수 구조 3각 시너지 최소 조합
+python wafixmatch.py run --frac 0.05 --method ver9.4 --seed 0   # 파인튜닝 구조 혁신 (최고 성능)
+python wafixmatch.py run --frac 0.05 --method ver9.4B2 --seed 0  # 순수 구조 3각 시너지 최소 조합
 
 # 3. 전체 결과 요약
 python wafixmatch.py summary
