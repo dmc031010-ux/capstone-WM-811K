@@ -1,0 +1,9 @@
+﻿data loaded 3.0s  train=138359 val=17295 test=17296 unlabeled=638507
+
+===== resnet18 frac=0.05 seed=0  labeled=6919 unlabeled=638507 =====
+--- stage 1: skip (done runs\resnet18\p0.05\seed0\supervised_cos)
+--- saliency map acquisition ---
+  saliency 512/638507  4s
+  saliency 102912/638507  59s
+  saliency 205312/638507  117s
+  saliency 307712/638507  176s

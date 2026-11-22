@@ -1,0 +1,23 @@
+== 요약 (test 17,296장 / seed 0, seed 1, 평균) ==
+test macro F1  ver8 0.831/0.783 (평균 0.807) | ver8.1 0.822/0.829 (평균 0.826) | ver8.2 0.803/0.813 (평균 0.808)
+val macro F1   ver8 0.818/0.795 (평균 0.806) | ver8.1 0.814/0.807 (평균 0.811) | ver8.2 0.786/0.791 (평균 0.788)
+소수 클래스 5개 평균   ver8 0.775/0.706 (평균 0.741) | ver8.1 0.766/0.764 (평균 0.765) | ver8.2 0.744/0.756 (평균 0.750)
+Scratch F1     ver8 0.477/0.444 (평균 0.460) | ver8.1 0.441/0.520 (평균 0.481) | ver8.2 0.367/0.438 (평균 0.402)
+사전학습 후 군집 NMI  ver8 0.111/0.079 (평균 0.095) | ver8.1 0.112/0.079 (평균 0.095) | ver8.2 0.137/0.152 (평균 0.144)
+
+== 클래스별 F1 (두 seed 평균) ==
+ver8    Center 0.884 Donut 0.800 Edge-Loc 0.750 Edge-Ring 0.946 Loc 0.692 Random 0.855 Scratch 0.460 Near-full 0.897 none 0.981
+ver8.1  Center 0.879 Donut 0.825 Edge-Loc 0.791 Edge-Ring 0.954 Loc 0.705 Random 0.865 Scratch 0.481 Near-full 0.947 none 0.984
+ver8.2  Center 0.858 Donut 0.843 Edge-Loc 0.740 Edge-Ring 0.945 Loc 0.701 Random 0.881 Scratch 0.402 Near-full 0.921 none 0.980
+
+== die 수 적은 (<1200, test 12,499장, Scratch 61) / 많은 (4,797장, Scratch 59) 웨이퍼 ==
+ver8    seed 0 | 적음: macro 0.792 · Scratch 맞힘 19/61 · none 오탐 208 | 많음: macro 0.866 · Scratch 맞힘 37/59 · none 오탐 91
+ver8    seed 1 | 적음: macro 0.725 · Scratch 맞힘 19/61 · none 오탐 342 | 많음: macro 0.826 · Scratch 맞힘 42/59 · none 오탐 127
+ver8.1  seed 0 | 적음: macro 0.781 · Scratch 맞힘 24/61 · none 오탐 259 | 많음: macro 0.841 · Scratch 맞힘 36/59 · none 오탐 146
+ver8.1  seed 1 | 적음: macro 0.782 · Scratch 맞힘 15/61 · none 오탐 137 | 많음: macro 0.861 · Scratch 맞힘 37/59 · none 오탐 58
+ver8.2  seed 0 | 적음: macro 0.766 · Scratch 맞힘 12/61 · none 오탐 313 | 많음: macro 0.809 · Scratch 맞힘 32/59 · none 오탐 198
+ver8.2  seed 1 | 적음: macro 0.765 · Scratch 맞힘 25/61 · none 오탐 276 | 많음: macro 0.850 · Scratch 맞힘 28/59 · none 오탐 91
+
+== 사전학습 마지막 손실 ==
+ver8: seed 0 0.0072 / seed 1 0.0217
+ver8.2: seed 0 0.0049 / seed 1 0.0092

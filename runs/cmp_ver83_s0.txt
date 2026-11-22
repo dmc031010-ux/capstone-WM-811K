@@ -1,0 +1,15 @@
+﻿학습된 r (0 = 평균, + 클수록 최대 쪽, - 클수록 최소 쪽):
+   Center -0.60  Donut +0.48  Edge-Loc +0.34  Edge-Ring +0.14  Loc -0.56  Random +0.07  Scratch +0.53  Near-full -0.33  none -0.66
+
+[ver8] test macro 0.831 · val 0.818 · 소수5 0.775 · best epoch 86
+   Center 0.915 Donut 0.872 Edge-Loc 0.750 Edge-Ring 0.956 Loc 0.731 Random 0.902 Scratch 0.477 Near-full 0.897 none 0.984
+   die<1200: macro 0.792 · Scratch 맞힘 19/61 · Scr→none 25 · Scr→Loc 16 · none→불량 오탐 208 (그중 →Scratch 17)
+   die≥1200: macro 0.866 · Scratch 맞힘 37/59 · Scr→none 16 · Scr→Loc 3 · none→불량 오탐 91 (그중 →Scratch 27)
+
+[ver8.3] test macro 0.836 · val 0.819 · 소수5 0.770 · best epoch 86
+   Center 0.918 Donut 0.820 Edge-Loc 0.802 Edge-Ring 0.967 Loc 0.724 Random 0.871 Scratch 0.469 Near-full 0.966 none 0.987
+   die<1200: macro 0.776 · Scratch 맞힘 17/61 · Scr→none 34 · Scr→Loc 9 · none→불량 오탐 90 (그중 →Scratch 1)
+   die≥1200: macro 0.865 · Scratch 맞힘 35/59 · Scr→none 19 · Scr→Loc 2 · none→불량 오탐 75 (그중 →Scratch 34)
+
+ver8 이 틀린 Scratch 64장 중 ver8.3 이 맞힘 8장 / ver8 이 맞힌 56장 중 ver8.3 이 틀림 12장
+#13 (idx 642918): ver8 none 0.990 Scr 0.0029 → ver8.3 none 0.995 Scr 0.0041 (예측 none)

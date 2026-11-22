@@ -1,0 +1,15 @@
+﻿min(Loc, Scratch) >= 0.1: 22장
+min(Loc, Scratch) >= 0.2: 8장
+min(Loc, Scratch) >= 0.3: 6장
+min(Loc, Scratch) >= 0.4: 0장
+
+기준 0.2: 8장 | 정답 분포 {np.str_('Loc'): np.int64(4), np.str_('Scratch'): np.int64(1), np.str_('none'): np.int64(3)} | 최종 예측 분포 {np.str_('Loc'): np.int64(4), np.str_('Scratch'): np.int64(4)}
+저장: c:\Users\annan\OneDrive\바탕 화면\umm\runs\hough_eda\fig16_loc_scratch_both.png
+#1 idx 220630 정답 Scratch Loc 0.57 Scr 0.39 예측 Loc s1 Loc
+#2 idx 774835 정답 none Loc 0.61 Scr 0.38 예측 Loc s1 Scratch
+#3 idx 281411 정답 Loc Loc 0.33 Scr 0.45 예측 Scratch s1 Loc
+#4 idx 781695 정답 none Loc 0.33 Scr 0.48 예측 Scratch s1 Loc
+#5 idx 740220 정답 Loc Loc 0.59 Scr 0.31 예측 Loc s1 Loc
+#6 idx 706256 정답 none Loc 0.30 Scr 0.53 예측 Scratch s1 Loc
+#7 idx 808398 정답 Loc Loc 0.75 Scr 0.24 예측 Loc s1 Loc
+#8 idx 729822 정답 Loc Loc 0.20 Scr 0.76 예측 Scratch s1 Loc

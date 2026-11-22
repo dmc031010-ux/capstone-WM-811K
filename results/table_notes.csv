@@ -1,0 +1,8 @@
+﻿항목,내용
+조건,"WM-811K, ResNet-18 (96x96), 5% 라벨 6,919장 + unlabeled 638,507장, seed 0"
+학습,"AdamW lr 0.01 고정 (ver3.2 미세조정 lr 1e-3 고정, ver3.2 자기지도 단계만 cosine)"
+증강,"ver1/ver1.1/ver2/ver3.2 는 cutout 없음, WaFixMatch 는 saliency 기반 cutout"
+평가,val macro-F1 최고 epoch 의 test 값
+성공 기준,"macro-F1 > WaFixMatch 재현, 소수 클래스(Near-full/Donut/Random/Scratch/Loc) 각각 -0.03 이내"
+학습 시간,"RTX 3050 노트북 4GB 실측, 필요한 사전 단계 포함, 발열에 따라 약 ±15%"
+주의,단일 seed 결과. 학습률 고정 시 val F1 의 epoch 간 흔들림이 큼 (±0.13~0.15)

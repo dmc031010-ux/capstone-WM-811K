@@ -1,0 +1,31 @@
+﻿train 138359 중 불량 0 개 등 제외 후 138065 / val 17261
+조합 계수 (rden, length, log thick): [[ 0.34  0.78 -0.39]]
+
+클래스별 중앙값 (train):
+class           r96     rnat     rden   length    thick
+Center        0.050    0.116    0.131    0.315    2.710
+Donut         0.050    0.100    0.106    0.443    2.684
+Edge-Loc      0.054    0.116    0.147    0.306    2.360
+Edge-Ring     0.045    0.076    0.092    0.311    1.778
+Loc           0.059    0.130    0.168    0.246    2.385
+Random        0.035    0.075    0.076    0.534    2.818
+Scratch       0.073    0.147    0.216    0.299    1.750
+Near-full     0.029    0.069    0.069    0.998    3.286
+none          0.054    0.123    0.182    0.112    1.750
+
+Scratch AUC (train; 'val' 열 = 조합 특징을 val 에서 평가):
+feature         전체    Center     Donut  Edge-Loc Edge-Ring       Loc    Random Near-full      none   작은:none    큰:none
+r96          0.769     0.821     0.848     0.738     0.876     0.645     0.980     1.000     0.763     0.719     0.770
+rnat         0.697     0.758     0.866     0.716     0.941     0.597     0.935     0.969     0.679     0.732     0.674
+rden         0.643     0.841     0.938     0.763     0.961     0.663     0.980     0.992     0.609     0.643     0.516
+length       0.833     0.487     0.253     0.477     0.500     0.578     0.223     0.004     0.890     0.933     0.916
+thick        0.526     0.899     0.930     0.803     0.572     0.813     0.954     0.993     0.491     0.471     0.426
+comb         0.820     0.731     0.514     0.636     0.646     0.708     0.439     0.037     0.848     0.894     0.787
+comb@val 전체 0.814 vs none 0.841 작은:none 0.872 큰:none 0.803
+부스팅 (Hough 5개, train 학습) @val: 전체 0.929 vs none 0.942 vs Loc 0.781 vs Edge-Loc 0.758 작은:none 0.928 큰:none 0.962 | val Scratch 119장
+r96 Mann-Whitney (Scratch > 나머지) p = 7.5e-182
+rden Mann-Whitney (Scratch > 나머지) p = 3.8e-53
+comb Mann-Whitney (Scratch > 나머지) p = 1.5e-255
+최고 직선 각도 none: 0/90 도 비율 0.258 (각도가 고르면 0.011)
+최고 직선 각도 Scratch: 0/90 도 비율 0.215 (각도가 고르면 0.011)
+그림 저장: C:\Users\annan\AppData\Local\Temp\claude\246a11bfeae9352a\51483819-ea63-4f92-b5dc-777d7dfc21a4\scratchpad\hough

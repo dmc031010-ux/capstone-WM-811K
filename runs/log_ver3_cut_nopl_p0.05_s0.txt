@@ -1,0 +1,101 @@
+﻿data loaded 2.7s  train=138359 val=17295 test=17296 unlabeled=638507
+
+===== resnet18 frac=0.05 seed=0  labeled=6919 unlabeled=638507 =====
+--- stage 1: skip (done runs\resnet18\p0.05\seed0\supervised)
+--- ver3 cluster + finetune: ver3_cut_ssl50_ft30_nopl ---
+[ver3 round 0] {'nmi': 0.15340253532863862, 'purity': 0.9189138400826835, 'round': 0, 'n_named_clusters': 49, 'n_pseudo': 49765, 'pseudo_class_counts': {'Center': 5013, 'Donut': 0, 'Edge-Loc': 5633, 'Edge-Ring': 3403, 'Loc': 9181, 'Random': 1081, 'Scratch': 6851, 'Near-full': 728, 'none': 17875}, 'pseudo_mean_weight': {'Center': 1.0, 'Donut': None, 'Edge-Loc': 1.0, 'Edge-Ring': 1.0, 'Loc': 1.0, 'Random': 1.0, 'Scratch': 1.0, 'Near-full': 1.0, 'none': 1.0}}
+   frac_in_own_majority_cluster: {'Center': 0.6037845705967977, 'Donut': 0.0, 'Edge-Loc': 0.0963623223319682, 'Edge-Ring': 0.8134039256198347, 'Loc': 0.21920668058455114, 'Random': 0.7907647907647908, 'Scratch': 0.0, 'Near-full': 1.0, 'none': 0.9925812878884226}
+epoch=1 val_macro_f1=0.5192 Ls=0.7089 Lc=0.0000 round=0 sec=6.6000 test_macro_f1=0.4850  *
+epoch=2 val_macro_f1=0.6641 Ls=0.3106 Lc=0.0000 round=0 sec=4.4000 test_macro_f1=0.6720  *
+epoch=3 val_macro_f1=0.7116 Ls=0.2327 Lc=0.0000 round=0 sec=4.4000 test_macro_f1=0.7096  *
+epoch=4 val_macro_f1=0.7147 Ls=0.1915 Lc=0.0000 round=0 sec=4.4000 test_macro_f1=0.7078  *
+epoch=5 val_macro_f1=0.7086 Ls=0.1382 Lc=0.0000 round=0 sec=4.4000
+epoch=6 val_macro_f1=0.6994 Ls=0.1266 Lc=0.0000 round=0 sec=4.4000
+epoch=7 val_macro_f1=0.7276 Ls=0.1287 Lc=0.0000 round=0 sec=4.4000 test_macro_f1=0.7244  *
+epoch=8 val_macro_f1=0.7691 Ls=0.1036 Lc=0.0000 round=0 sec=4.4000 test_macro_f1=0.7745  *
+epoch=9 val_macro_f1=0.7120 Ls=0.0919 Lc=0.0000 round=0 sec=4.4000
+epoch=10 val_macro_f1=0.7408 Ls=0.0837 Lc=0.0000 round=0 sec=4.4000
+epoch=11 val_macro_f1=0.7520 Ls=0.0777 Lc=0.0000 round=0 sec=4.4000
+epoch=12 val_macro_f1=0.7588 Ls=0.0801 Lc=0.0000 round=0 sec=4.7000
+epoch=13 val_macro_f1=0.7841 Ls=0.0798 Lc=0.0000 round=0 sec=4.4000 test_macro_f1=0.8069  *
+epoch=14 val_macro_f1=0.7706 Ls=0.0629 Lc=0.0000 round=0 sec=4.5000
+epoch=15 val_macro_f1=0.7480 Ls=0.0650 Lc=0.0000 round=0 sec=4.4000
+epoch=16 val_macro_f1=0.7540 Ls=0.0563 Lc=0.0000 round=0 sec=4.4000
+epoch=17 val_macro_f1=0.7952 Ls=0.0593 Lc=0.0000 round=0 sec=4.4000 test_macro_f1=0.8105  *
+epoch=18 val_macro_f1=0.7735 Ls=0.0581 Lc=0.0000 round=0 sec=4.4000
+epoch=19 val_macro_f1=0.7883 Ls=0.0519 Lc=0.0000 round=0 sec=4.5000
+epoch=20 val_macro_f1=0.7363 Ls=0.0533 Lc=0.0000 round=0 sec=4.5000
+epoch=21 val_macro_f1=0.8131 Ls=0.0492 Lc=0.0000 round=0 sec=4.5000 test_macro_f1=0.8399  *
+epoch=22 val_macro_f1=0.7590 Ls=0.0433 Lc=0.0000 round=0 sec=4.5000
+epoch=23 val_macro_f1=0.7558 Ls=0.0513 Lc=0.0000 round=0 sec=4.5000
+epoch=24 val_macro_f1=0.7740 Ls=0.0467 Lc=0.0000 round=0 sec=4.5000
+epoch=25 val_macro_f1=0.7870 Ls=0.0486 Lc=0.0000 round=0 sec=4.5000
+epoch=26 val_macro_f1=0.7465 Ls=0.0393 Lc=0.0000 round=0 sec=4.4000
+epoch=27 val_macro_f1=0.7741 Ls=0.0313 Lc=0.0000 round=0 sec=4.4000
+epoch=28 val_macro_f1=0.7306 Ls=0.0480 Lc=0.0000 round=0 sec=4.5000
+epoch=29 val_macro_f1=0.7839 Ls=0.0437 Lc=0.0000 round=0 sec=4.5000
+epoch=30 val_macro_f1=0.7744 Ls=0.0395 Lc=0.0000 round=0 sec=4.5000
+[ver3 round 1] {'nmi': 0.23928534888023134, 'purity': 0.9570103860247616, 'round': 1, 'n_named_clusters': 84, 'n_pseudo': 88944, 'pseudo_class_counts': {'Center': 4258, 'Donut': 445, 'Edge-Loc': 6757, 'Edge-Ring': 4141, 'Loc': 4642, 'Random': 1026, 'Scratch': 4035, 'Near-full': 204, 'none': 63436}, 'pseudo_mean_weight': {'Center': 1.0, 'Donut': 1.0, 'Edge-Loc': 1.0, 'Edge-Ring': 1.0, 'Loc': 1.0, 'Random': 1.0, 'Scratch': 1.0, 'Near-full': 1.0, 'none': 1.0}}
+   frac_in_own_majority_cluster: {'Center': 0.8724890829694323, 'Donut': 0.7702702702702703, 'Edge-Loc': 0.6497229583232956, 'Edge-Ring': 0.9089617768595041, 'Loc': 0.46694502435629787, 'Random': 0.7070707070707071, 'Scratch': 0.0649895178197065, 'Near-full': 0.7647058823529411, 'none': 0.9949637542922548}
+epoch=31 val_macro_f1=0.7875 Ls=0.0379 Lc=0.0000 round=1 sec=4.4000
+epoch=32 val_macro_f1=0.7689 Ls=0.0396 Lc=0.0000 round=1 sec=4.5000
+epoch=33 val_macro_f1=0.7442 Ls=0.0502 Lc=0.0000 round=1 sec=4.5000
+epoch=34 val_macro_f1=0.7532 Ls=0.0533 Lc=0.0000 round=1 sec=4.5000
+epoch=35 val_macro_f1=0.8110 Ls=0.0444 Lc=0.0000 round=1 sec=4.4000
+epoch=36 val_macro_f1=0.7802 Ls=0.0353 Lc=0.0000 round=1 sec=4.5000
+epoch=37 val_macro_f1=0.8044 Ls=0.0360 Lc=0.0000 round=1 sec=4.4000
+epoch=38 val_macro_f1=0.7717 Ls=0.0376 Lc=0.0000 round=1 sec=4.4000
+epoch=39 val_macro_f1=0.7848 Ls=0.0263 Lc=0.0000 round=1 sec=4.4000
+epoch=40 val_macro_f1=0.8006 Ls=0.0279 Lc=0.0000 round=1 sec=4.4000
+epoch=41 val_macro_f1=0.7617 Ls=0.0309 Lc=0.0000 round=1 sec=4.4000
+epoch=42 val_macro_f1=0.7933 Ls=0.0330 Lc=0.0000 round=1 sec=4.4000
+epoch=43 val_macro_f1=0.7956 Ls=0.0244 Lc=0.0000 round=1 sec=4.4000
+epoch=44 val_macro_f1=0.7454 Ls=0.0340 Lc=0.0000 round=1 sec=4.4000
+epoch=45 val_macro_f1=0.7770 Ls=0.0546 Lc=0.0000 round=1 sec=4.4000
+epoch=46 val_macro_f1=0.7407 Ls=0.0449 Lc=0.0000 round=1 sec=4.5000
+epoch=47 val_macro_f1=0.7725 Ls=0.0386 Lc=0.0000 round=1 sec=4.5000
+epoch=48 val_macro_f1=0.7781 Ls=0.0320 Lc=0.0000 round=1 sec=4.5000
+epoch=49 val_macro_f1=0.7763 Ls=0.0309 Lc=0.0000 round=1 sec=4.5000
+epoch=50 val_macro_f1=0.7188 Ls=0.0322 Lc=0.0000 round=1 sec=4.4000
+epoch=51 val_macro_f1=0.7904 Ls=0.0353 Lc=0.0000 round=1 sec=4.4000
+epoch=52 val_macro_f1=0.7953 Ls=0.0334 Lc=0.0000 round=1 sec=4.5000
+epoch=53 val_macro_f1=0.7661 Ls=0.0272 Lc=0.0000 round=1 sec=4.4000
+epoch=54 val_macro_f1=0.8023 Ls=0.0296 Lc=0.0000 round=1 sec=4.5000
+epoch=55 val_macro_f1=0.7894 Ls=0.0240 Lc=0.0000 round=1 sec=4.4000
+epoch=56 val_macro_f1=0.7719 Ls=0.0235 Lc=0.0000 round=1 sec=4.4000
+epoch=57 val_macro_f1=0.7922 Ls=0.0240 Lc=0.0000 round=1 sec=4.5000
+epoch=58 val_macro_f1=0.8009 Ls=0.0204 Lc=0.0000 round=1 sec=4.5000
+epoch=59 val_macro_f1=0.7746 Ls=0.0251 Lc=0.0000 round=1 sec=4.5000
+epoch=60 val_macro_f1=0.7870 Ls=0.0217 Lc=0.0000 round=1 sec=4.5000
+[ver3 round 2] {'nmi': 0.2350256166212883, 'purity': 0.9590919275218814, 'round': 2, 'n_named_clusters': 87, 'n_pseudo': 91473, 'pseudo_class_counts': {'Center': 4513, 'Donut': 389, 'Edge-Loc': 8161, 'Edge-Ring': 3919, 'Loc': 4354, 'Random': 1279, 'Scratch': 5984, 'Near-full': 206, 'none': 62668}, 'pseudo_mean_weight': {'Center': 1.0, 'Donut': 1.0, 'Edge-Loc': 1.0, 'Edge-Ring': 1.0, 'Loc': 1.0, 'Random': 1.0, 'Scratch': 1.0, 'Near-full': 1.0, 'none': 1.0}}
+   frac_in_own_majority_cluster: {'Center': 0.92372634643377, 'Donut': 0.704954954954955, 'Edge-Loc': 0.6571910383040231, 'Edge-Ring': 0.8994059917355371, 'Loc': 0.5389700765483646, 'Random': 0.7633477633477633, 'Scratch': 0.44758909853249473, 'Near-full': 0.8823529411764706, 'none': 0.9912247233880198}
+epoch=61 val_macro_f1=0.7692 Ls=0.0254 Lc=0.0000 round=2 sec=4.4000
+epoch=62 val_macro_f1=0.8198 Ls=0.0185 Lc=0.0000 round=2 sec=4.4000 test_macro_f1=0.8428  *
+epoch=63 val_macro_f1=0.8168 Ls=0.0243 Lc=0.0000 round=2 sec=4.4000
+epoch=64 val_macro_f1=0.7729 Ls=0.0173 Lc=0.0000 round=2 sec=4.4000
+epoch=65 val_macro_f1=0.7561 Ls=0.0161 Lc=0.0000 round=2 sec=4.4000
+epoch=66 val_macro_f1=0.7773 Ls=0.0253 Lc=0.0000 round=2 sec=4.4000
+epoch=67 val_macro_f1=0.8010 Ls=0.0262 Lc=0.0000 round=2 sec=4.4000
+epoch=68 val_macro_f1=0.8189 Ls=0.0254 Lc=0.0000 round=2 sec=4.4000
+epoch=69 val_macro_f1=0.7766 Ls=0.0208 Lc=0.0000 round=2 sec=4.5000
+epoch=70 val_macro_f1=0.7958 Ls=0.0202 Lc=0.0000 round=2 sec=4.4000
+epoch=71 val_macro_f1=0.7782 Ls=0.0169 Lc=0.0000 round=2 sec=4.4000
+epoch=72 val_macro_f1=0.8065 Ls=0.0226 Lc=0.0000 round=2 sec=4.4000
+epoch=73 val_macro_f1=0.7618 Ls=0.0257 Lc=0.0000 round=2 sec=4.4000
+epoch=74 val_macro_f1=0.7890 Ls=0.0275 Lc=0.0000 round=2 sec=4.4000
+epoch=75 val_macro_f1=0.7593 Ls=0.0262 Lc=0.0000 round=2 sec=4.4000
+epoch=76 val_macro_f1=0.8167 Ls=0.0184 Lc=0.0000 round=2 sec=4.4000
+epoch=77 val_macro_f1=0.7883 Ls=0.0204 Lc=0.0000 round=2 sec=4.4000
+epoch=78 val_macro_f1=0.8053 Ls=0.0275 Lc=0.0000 round=2 sec=4.4000
+epoch=79 val_macro_f1=0.8063 Ls=0.0149 Lc=0.0000 round=2 sec=4.5000
+epoch=80 val_macro_f1=0.8149 Ls=0.0175 Lc=0.0000 round=2 sec=4.4000
+epoch=81 val_macro_f1=0.7911 Ls=0.0243 Lc=0.0000 round=2 sec=4.4000
+epoch=82 val_macro_f1=0.7600 Ls=0.0327 Lc=0.0000 round=2 sec=4.4000
+epoch=83 val_macro_f1=0.7665 Ls=0.0170 Lc=0.0000 round=2 sec=4.4000
+epoch=84 val_macro_f1=0.8032 Ls=0.0125 Lc=0.0000 round=2 sec=4.5000
+epoch=85 val_macro_f1=0.8005 Ls=0.0171 Lc=0.0000 round=2 sec=4.4000
+epoch=86 val_macro_f1=0.8107 Ls=0.0231 Lc=0.0000 round=2 sec=4.4000
+epoch=87 val_macro_f1=0.7483 Ls=0.0315 Lc=0.0000 round=2 sec=4.4000
+epoch=88 val_macro_f1=0.7835 Ls=0.0269 Lc=0.0000 round=2 sec=4.5000
+epoch=89 val_macro_f1=0.8218 Ls=0.0142 Lc=0.0000 round=2 sec=4.4000 test_macro_f1=0.8475  *
+epoch=90 val_macro_f1=0.7868 Ls=0.0182 Lc=0.0000 round=2 sec=4.5000

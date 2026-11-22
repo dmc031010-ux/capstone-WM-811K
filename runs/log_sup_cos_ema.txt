@@ -1,0 +1,104 @@
+﻿data loaded 0.7s  train=138359 val=17295 test=17296 unlabeled=638507
+
+===== resnet18 frac=0.05 seed=0  labeled=6919 unlabeled=638507 =====
+--- stage 1: supervised (saliency model) ---
+epoch=1 val_macro_f1=0.0011 loss=1.8623 sec=6.2000 test_macro_f1=0.0011  *
+epoch=2 val_macro_f1=0.0111 loss=0.9576 sec=5.2000 test_macro_f1=0.0118  *
+epoch=3 val_macro_f1=0.0045 loss=0.8822 sec=4.8000
+epoch=4 val_macro_f1=0.0045 loss=0.7287 sec=5.3000
+epoch=5 val_macro_f1=0.0045 loss=0.5901 sec=5.0000
+epoch=6 val_macro_f1=0.0045 loss=0.5430 sec=5.0000
+epoch=7 val_macro_f1=0.0045 loss=0.4831 sec=5.2000
+epoch=8 val_macro_f1=0.0045 loss=0.4478 sec=5.0000
+epoch=9 val_macro_f1=0.0045 loss=0.3943 sec=4.9000
+epoch=10 val_macro_f1=0.0045 loss=0.3667 sec=5.0000
+epoch=11 val_macro_f1=0.0045 loss=0.3321 sec=4.9000
+epoch=12 val_macro_f1=0.0045 loss=0.3063 sec=5.1000
+epoch=13 val_macro_f1=0.0045 loss=0.2968 sec=5.1000
+epoch=14 val_macro_f1=0.0045 loss=0.2946 sec=5.1000
+epoch=15 val_macro_f1=0.0045 loss=0.2749 sec=5.0000
+epoch=16 val_macro_f1=0.0045 loss=0.2374 sec=5.0000
+epoch=17 val_macro_f1=0.0045 loss=0.2187 sec=4.9000
+epoch=18 val_macro_f1=0.0045 loss=0.2229 sec=4.9000
+epoch=19 val_macro_f1=0.0045 loss=0.2347 sec=4.9000
+epoch=20 val_macro_f1=0.0045 loss=0.1979 sec=4.9000
+epoch=21 val_macro_f1=0.0045 loss=0.1766 sec=4.9000
+epoch=22 val_macro_f1=0.0045 loss=0.1657 sec=4.9000
+epoch=23 val_macro_f1=0.0045 loss=0.1489 sec=4.8000
+epoch=24 val_macro_f1=0.0043 loss=0.1466 sec=4.9000
+epoch=25 val_macro_f1=0.0049 loss=0.1434 sec=4.9000
+epoch=26 val_macro_f1=0.0045 loss=0.1310 sec=5.2000
+epoch=27 val_macro_f1=0.0066 loss=0.1300 sec=5.2000
+epoch=28 val_macro_f1=0.0044 loss=0.1516 sec=4.9000
+epoch=29 val_macro_f1=0.0015 loss=0.1382 sec=4.9000
+epoch=30 val_macro_f1=0.0015 loss=0.1372 sec=4.9000
+epoch=31 val_macro_f1=0.0015 loss=0.1100 sec=4.9000
+epoch=32 val_macro_f1=0.0015 loss=0.1233 sec=5.0000
+epoch=33 val_macro_f1=0.0015 loss=0.1187 sec=4.9000
+epoch=34 val_macro_f1=0.0015 loss=0.1067 sec=4.9000
+epoch=35 val_macro_f1=0.0015 loss=0.1009 sec=4.9000
+epoch=36 val_macro_f1=0.0016 loss=0.0799 sec=4.9000
+epoch=37 val_macro_f1=0.0032 loss=0.0810 sec=5.1000
+epoch=38 val_macro_f1=0.0184 loss=0.1040 sec=5.2000 test_macro_f1=0.0185  *
+epoch=39 val_macro_f1=0.0467 loss=0.0782 sec=4.9000 test_macro_f1=0.0489  *
+epoch=40 val_macro_f1=0.0736 loss=0.0752 sec=4.9000 test_macro_f1=0.0734  *
+epoch=41 val_macro_f1=0.0929 loss=0.0774 sec=5.0000 test_macro_f1=0.0935  *
+epoch=42 val_macro_f1=0.1090 loss=0.0736 sec=5.4000 test_macro_f1=0.1095  *
+epoch=43 val_macro_f1=0.1228 loss=0.0856 sec=5.5000 test_macro_f1=0.1228  *
+epoch=44 val_macro_f1=0.1266 loss=0.0807 sec=5.4000 test_macro_f1=0.1264  *
+epoch=45 val_macro_f1=0.1281 loss=0.0828 sec=5.0000 test_macro_f1=0.1257  *
+epoch=46 val_macro_f1=0.1282 loss=0.0575 sec=5.5000 test_macro_f1=0.1268  *
+epoch=47 val_macro_f1=0.1289 loss=0.0655 sec=5.1000 test_macro_f1=0.1283  *
+epoch=48 val_macro_f1=0.1303 loss=0.0668 sec=5.1000 test_macro_f1=0.1298  *
+epoch=49 val_macro_f1=0.1318 loss=0.0684 sec=5.3000 test_macro_f1=0.1311  *
+epoch=50 val_macro_f1=0.1347 loss=0.0618 sec=5.1000 test_macro_f1=0.1333  *
+epoch=51 val_macro_f1=0.1370 loss=0.0602 sec=4.9000 test_macro_f1=0.1364  *
+epoch=52 val_macro_f1=0.1380 loss=0.0545 sec=4.9000 test_macro_f1=0.1383  *
+epoch=53 val_macro_f1=0.1398 loss=0.0513 sec=4.8000 test_macro_f1=0.1408  *
+epoch=54 val_macro_f1=0.1445 loss=0.0488 sec=4.9000 test_macro_f1=0.1426  *
+epoch=55 val_macro_f1=0.1476 loss=0.0463 sec=4.9000 test_macro_f1=0.1452  *
+epoch=56 val_macro_f1=0.1507 loss=0.0548 sec=4.9000 test_macro_f1=0.1477  *
+epoch=57 val_macro_f1=0.1550 loss=0.0656 sec=4.9000 test_macro_f1=0.1495  *
+epoch=58 val_macro_f1=0.1567 loss=0.0643 sec=4.9000 test_macro_f1=0.1515  *
+epoch=59 val_macro_f1=0.1594 loss=0.0759 sec=4.9000 test_macro_f1=0.1552  *
+epoch=60 val_macro_f1=0.1600 loss=0.0451 sec=4.7000 test_macro_f1=0.1552  *
+epoch=61 val_macro_f1=0.1615 loss=0.0417 sec=4.8000 test_macro_f1=0.1594  *
+epoch=62 val_macro_f1=0.1634 loss=0.0291 sec=5.3000 test_macro_f1=0.1624  *
+epoch=63 val_macro_f1=0.1689 loss=0.0390 sec=5.4000 test_macro_f1=0.1653  *
+epoch=64 val_macro_f1=0.1706 loss=0.0416 sec=5.4000 test_macro_f1=0.1689  *
+epoch=65 val_macro_f1=0.1727 loss=0.0425 sec=5.3000 test_macro_f1=0.1719  *
+epoch=66 val_macro_f1=0.1878 loss=0.0398 sec=5.1000 test_macro_f1=0.1737  *
+epoch=67 val_macro_f1=0.1963 loss=0.0413 sec=5.1000 test_macro_f1=0.1756  *
+epoch=68 val_macro_f1=0.1984 loss=0.0384 sec=5.1000 test_macro_f1=0.1771  *
+epoch=69 val_macro_f1=0.2028 loss=0.0311 sec=5.4000 test_macro_f1=0.1811  *
+epoch=70 val_macro_f1=0.2043 loss=0.0285 sec=5.1000 test_macro_f1=0.1922  *
+epoch=71 val_macro_f1=0.2169 loss=0.0378 sec=5.4000 test_macro_f1=0.1980  *
+epoch=72 val_macro_f1=0.2195 loss=0.0467 sec=4.9000 test_macro_f1=0.2045  *
+epoch=73 val_macro_f1=0.2258 loss=0.0331 sec=5.2000 test_macro_f1=0.2174  *
+epoch=74 val_macro_f1=0.2321 loss=0.0318 sec=5.3000 test_macro_f1=0.2206  *
+epoch=75 val_macro_f1=0.2374 loss=0.0268 sec=5.2000 test_macro_f1=0.2280  *
+epoch=76 val_macro_f1=0.2463 loss=0.0237 sec=5.3000 test_macro_f1=0.2385  *
+epoch=77 val_macro_f1=0.2525 loss=0.0225 sec=5.4000 test_macro_f1=0.2466  *
+epoch=78 val_macro_f1=0.2630 loss=0.0261 sec=5.2000 test_macro_f1=0.2645  *
+epoch=79 val_macro_f1=0.2742 loss=0.0220 sec=5.0000 test_macro_f1=0.2796  *
+epoch=80 val_macro_f1=0.2833 loss=0.0276 sec=5.0000 test_macro_f1=0.2924  *
+epoch=81 val_macro_f1=0.2956 loss=0.0340 sec=5.3000 test_macro_f1=0.3034  *
+epoch=82 val_macro_f1=0.3058 loss=0.0250 sec=5.3000 test_macro_f1=0.3206  *
+epoch=83 val_macro_f1=0.3148 loss=0.0195 sec=5.1000 test_macro_f1=0.3343  *
+epoch=84 val_macro_f1=0.3289 loss=0.0142 sec=5.1000 test_macro_f1=0.3489  *
+epoch=85 val_macro_f1=0.3367 loss=0.0186 sec=5.3000 test_macro_f1=0.3644  *
+epoch=86 val_macro_f1=0.3600 loss=0.0194 sec=5.0000 test_macro_f1=0.3759  *
+epoch=87 val_macro_f1=0.3790 loss=0.0232 sec=4.8000 test_macro_f1=0.3890  *
+epoch=88 val_macro_f1=0.3918 loss=0.0241 sec=5.3000 test_macro_f1=0.4037  *
+epoch=89 val_macro_f1=0.4065 loss=0.0163 sec=5.3000 test_macro_f1=0.4149  *
+epoch=90 val_macro_f1=0.4201 loss=0.0163 sec=5.4000 test_macro_f1=0.4312  *
+epoch=91 val_macro_f1=0.4333 loss=0.0194 sec=5.4000 test_macro_f1=0.4466  *
+epoch=92 val_macro_f1=0.4527 loss=0.0154 sec=5.1000 test_macro_f1=0.4607  *
+epoch=93 val_macro_f1=0.4667 loss=0.0139 sec=5.0000 test_macro_f1=0.4729  *
+epoch=94 val_macro_f1=0.4835 loss=0.0133 sec=5.0000 test_macro_f1=0.4877  *
+epoch=95 val_macro_f1=0.5068 loss=0.0126 sec=5.0000 test_macro_f1=0.5017  *
+epoch=96 val_macro_f1=0.5163 loss=0.0124 sec=5.0000 test_macro_f1=0.5114  *
+epoch=97 val_macro_f1=0.5284 loss=0.0140 sec=5.1000 test_macro_f1=0.5264  *
+epoch=98 val_macro_f1=0.5407 loss=0.0142 sec=5.0000 test_macro_f1=0.5379  *
+epoch=99 val_macro_f1=0.5523 loss=0.0102 sec=4.8000 test_macro_f1=0.5461  *
+epoch=100 val_macro_f1=0.5642 loss=0.0109 sec=4.9000 test_macro_f1=0.5549  *

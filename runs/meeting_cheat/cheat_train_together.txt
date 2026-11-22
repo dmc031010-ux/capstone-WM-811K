@@ -1,0 +1,6 @@
+﻿=== bn_groups=together
+ssl epoch=1 loss=0.0332 z_std=0.0243 sec=276.7
+ssl epoch=2 loss=0.0165 z_std=0.0263 sec=278.8
+ssl epoch=3 loss=0.0145 z_std=0.0266 sec=275.3
+ssl epoch=4 loss=0.0139 z_std=0.0267 sec=274.1
+ssl epoch=5 loss=0.0135 z_std=0.0266 sec=269.4

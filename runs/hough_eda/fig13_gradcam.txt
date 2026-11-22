@@ -1,0 +1,72 @@
+﻿seed 0 오답 64장
+Scratch Grad-CAM 이 완전히 0 (Scratch 근거가 그림 어디에도 없음): 1장 → 번호 [48]
+예측 클래스 CAM 세기 중앙값 0.214 vs Scratch CAM 세기 중앙값 0.623
+로짓 차이 (예측 - Scratch) 중앙값 7.18
+#1 idx 4596 s0 none 1.00 Scr 0.000 | 로짓 12.8 vs Scr -9.2 | CAM 최대 예측 0.195 Scr 0.476
+#2 idx 5226 s0 none 1.00 Scr 0.000 | 로짓 10.9 vs Scr -1.5 | CAM 최대 예측 0.081 Scr 1.225
+#3 idx 654606 s0 none 1.00 Scr 0.000 | 로짓 10.7 vs Scr 0.7 | CAM 최대 예측 0.122 Scr 1.014
+#4 idx 245125 s0 none 1.00 Scr 0.000 | 로짓 7.3 vs Scr -2.0 | CAM 최대 예측 0.116 Scr 0.860
+#5 idx 723627 s0 none 1.00 Scr 0.000 | 로짓 8.6 vs Scr -0.0 | CAM 최대 예측 0.000 Scr 1.006
+#6 idx 289423 s0 none 1.00 Scr 0.000 | 로짓 9.0 vs Scr 1.4 | CAM 최대 예측 0.245 Scr 0.455
+#7 idx 735688 s0 none 1.00 Scr 0.001 | 로짓 7.1 vs Scr -0.4 | CAM 최대 예측 0.002 Scr 1.389
+#8 idx 178013 s0 none 1.00 Scr 0.001 | 로짓 10.3 vs Scr 3.6 | CAM 최대 예측 0.238 Scr 0.582
+#9 idx 652005 s0 none 1.00 Scr 0.001 | 로짓 8.9 vs Scr 1.6 | CAM 최대 예측 0.035 Scr 1.389
+#10 idx 658327 s0 none 1.00 Scr 0.000 | 로짓 8.9 vs Scr -1.2 | CAM 최대 예측 0.181 Scr 1.074
+#11 idx 759432 s0 none 0.99 Scr 0.001 | 로짓 9.1 vs Scr 2.0 | CAM 최대 예측 0.268 Scr 0.832
+#12 idx 692051 s0 none 0.99 Scr 0.000 | 로짓 8.6 vs Scr -6.4 | CAM 최대 예측 0.229 Scr 0.585
+#13 idx 642918 s0 none 0.99 Scr 0.003 | 로짓 5.8 vs Scr 0.0 | CAM 최대 예측 0.078 Scr 1.307
+#14 idx 177754 s0 none 0.99 Scr 0.000 | 로짓 8.1 vs Scr -1.1 | CAM 최대 예측 0.210 Scr 0.528
+#15 idx 789314 s0 none 0.99 Scr 0.000 | 로짓 9.0 vs Scr -0.5 | CAM 최대 예측 0.238 Scr 0.669
+#16 idx 808333 s0 none 0.99 Scr 0.012 | 로짓 7.4 vs Scr 2.9 | CAM 최대 예측 0.135 Scr 0.631
+#17 idx 798038 s0 none 0.97 Scr 0.028 | 로짓 8.4 vs Scr 4.8 | CAM 최대 예측 0.188 Scr 1.036
+#18 idx 647677 s0 none 0.97 Scr 0.033 | 로짓 6.6 vs Scr 3.2 | CAM 최대 예측 0.097 Scr 1.284
+#19 idx 290111 s0 none 0.96 Scr 0.032 | 로짓 6.0 vs Scr 2.6 | CAM 최대 예측 0.163 Scr 0.835
+#20 idx 177975 s0 none 0.95 Scr 0.011 | 로짓 8.0 vs Scr 3.6 | CAM 최대 예측 0.228 Scr 0.635
+#21 idx 775660 s0 none 0.95 Scr 0.048 | 로짓 5.8 vs Scr 2.8 | CAM 최대 예측 0.163 Scr 0.933
+#22 idx 295312 s0 none 0.95 Scr 0.000 | 로짓 4.9 vs Scr -3.8 | CAM 최대 예측 0.000 Scr 0.587
+#23 idx 727711 s0 none 0.94 Scr 0.000 | 로짓 8.8 vs Scr -7.9 | CAM 최대 예측 0.218 Scr 0.454
+#24 idx 7446 s0 none 0.93 Scr 0.068 | 로짓 6.6 vs Scr 4.0 | CAM 최대 예측 0.090 Scr 0.798
+#25 idx 660120 s0 none 0.93 Scr 0.015 | 로짓 6.6 vs Scr 2.4 | CAM 최대 예측 0.282 Scr 0.867
+#26 idx 654713 s0 none 0.93 Scr 0.027 | 로짓 6.1 vs Scr 2.5 | CAM 최대 예측 0.109 Scr 1.298
+#27 idx 808086 s0 none 0.92 Scr 0.000 | 로짓 7.9 vs Scr 0.1 | CAM 최대 예측 0.143 Scr 1.201
+#28 idx 744519 s0 none 0.92 Scr 0.000 | 로짓 8.0 vs Scr -2.7 | CAM 최대 예측 0.350 Scr 0.715
+#29 idx 476506 s0 none 0.90 Scr 0.085 | 로짓 4.1 vs Scr 1.7 | CAM 최대 예측 0.018 Scr 1.364
+#30 idx 772187 s0 none 0.89 Scr 0.071 | 로짓 6.7 vs Scr 4.2 | CAM 최대 예측 0.028 Scr 1.198
+#31 idx 245796 s0 none 0.84 Scr 0.043 | 로짓 3.9 vs Scr 0.9 | CAM 최대 예측 0.088 Scr 0.498
+#32 idx 808812 s0 none 0.84 Scr 0.157 | 로짓 5.0 vs Scr 3.3 | CAM 최대 예측 0.000 Scr 1.224
+#33 idx 740052 s0 none 0.83 Scr 0.143 | 로짓 5.2 vs Scr 3.4 | CAM 최대 예측 0.000 Scr 0.987
+#34 idx 721210 s0 none 0.82 Scr 0.021 | 로짓 3.3 vs Scr -0.4 | CAM 최대 예측 0.000 Scr 0.645
+#35 idx 725182 s0 none 0.74 Scr 0.056 | 로짓 4.5 vs Scr 1.9 | CAM 최대 예측 0.006 Scr 0.767
+#36 idx 801066 s0 none 0.70 Scr 0.000 | 로짓 7.6 vs Scr 0.1 | CAM 최대 예측 0.096 Scr 0.714
+#37 idx 695209 s0 none 0.69 Scr 0.000 | 로짓 6.8 vs Scr -2.4 | CAM 최대 예측 0.260 Scr 0.616
+#38 idx 691963 s0 none 0.60 Scr 0.403 | 로짓 6.1 vs Scr 5.7 | CAM 최대 예측 0.020 Scr 1.584
+#39 idx 150602 s0 none 0.52 Scr 0.479 | 로짓 5.0 vs Scr 4.9 | CAM 최대 예측 0.145 Scr 1.086
+#40 idx 657552 s0 none 0.49 Scr 0.000 | 로짓 3.1 vs Scr -4.8 | CAM 최대 예측 0.000 Scr 0.417
+#41 idx 229327 s0 none 0.45 Scr 0.154 | 로짓 4.3 vs Scr 3.2 | CAM 최대 예측 0.098 Scr 0.444
+#42 idx 735363 s0 Donut 1.00 Scr 0.000 | 로짓 10.8 vs Scr 1.5 | CAM 최대 예측 0.449 Scr 0.472
+#43 idx 687261 s0 Edge-Loc 1.00 Scr 0.001 | 로짓 7.8 vs Scr 1.2 | CAM 최대 예측 0.586 Scr 0.285
+#44 idx 714931 s0 Edge-Loc 0.89 Scr 0.027 | 로짓 5.0 vs Scr 1.5 | CAM 최대 예측 0.708 Scr 0.391
+#45 idx 302430 s0 Edge-Loc 0.86 Scr 0.007 | 로짓 3.4 vs Scr -1.4 | CAM 최대 예측 0.198 Scr 0.450
+#46 idx 684567 s0 Loc 1.00 Scr 0.000 | 로짓 10.4 vs Scr -0.8 | CAM 최대 예측 0.437 Scr 0.081
+#47 idx 726722 s0 Loc 1.00 Scr 0.000 | 로짓 9.6 vs Scr -0.3 | CAM 최대 예측 0.414 Scr 0.232
+#48 idx 772682 s0 Loc 1.00 Scr 0.000 | 로짓 10.0 vs Scr 1.0 | CAM 최대 예측 0.466 Scr 0.000
+#49 idx 680975 s0 Loc 1.00 Scr 0.000 | 로짓 10.6 vs Scr 0.1 | CAM 최대 예측 0.526 Scr 0.245
+#50 idx 683846 s0 Loc 1.00 Scr 0.000 | 로짓 8.8 vs Scr 0.8 | CAM 최대 예측 0.505 Scr 0.780
+#51 idx 802798 s0 Loc 0.99 Scr 0.008 | 로짓 5.9 vs Scr 1.1 | CAM 최대 예측 0.701 Scr 0.361
+#52 idx 810727 s0 Loc 0.99 Scr 0.000 | 로짓 8.2 vs Scr -2.6 | CAM 최대 예측 0.445 Scr 0.153
+#53 idx 683097 s0 Loc 0.98 Scr 0.022 | 로짓 7.3 vs Scr 3.5 | CAM 최대 예측 0.720 Scr 0.334
+#54 idx 658405 s0 Loc 0.97 Scr 0.000 | 로짓 7.4 vs Scr -6.7 | CAM 최대 예측 0.436 Scr 0.348
+#55 idx 810301 s0 Loc 0.96 Scr 0.000 | 로짓 6.7 vs Scr -5.2 | CAM 최대 예측 0.976 Scr 0.117
+#56 idx 733293 s0 Loc 0.96 Scr 0.020 | 로짓 6.3 vs Scr 2.5 | CAM 최대 예측 0.773 Scr 0.887
+#57 idx 570348 s0 Loc 0.96 Scr 0.000 | 로짓 6.2 vs Scr -1.5 | CAM 최대 예측 0.831 Scr 0.491
+#58 idx 655507 s0 Loc 0.94 Scr 0.063 | 로짓 6.2 vs Scr 3.5 | CAM 최대 예측 0.413 Scr 0.031
+#59 idx 712496 s0 Loc 0.87 Scr 0.000 | 로짓 8.3 vs Scr -4.6 | CAM 최대 예측 1.078 Scr 0.582
+#60 idx 691649 s0 Loc 0.86 Scr 0.000 | 로짓 7.0 vs Scr -5.2 | CAM 최대 예측 0.944 Scr 0.089
+#61 idx 170383 s0 Loc 0.84 Scr 0.000 | 로짓 4.3 vs Scr -3.3 | CAM 최대 예측 0.529 Scr 0.373
+#62 idx 654700 s0 Loc 0.83 Scr 0.113 | 로짓 7.0 vs Scr 5.0 | CAM 최대 예측 1.129 Scr 0.533
+#63 idx 802073 s0 Loc 0.72 Scr 0.120 | 로짓 5.1 vs Scr 3.3 | CAM 최대 예측 0.907 Scr 0.251
+#64 idx 220630 s0 Loc 0.57 Scr 0.390 | 로짓 4.5 vs Scr 4.1 | CAM 최대 예측 0.395 Scr 0.214
+저장: c:\Users\annan\OneDrive\바탕 화면\umm\runs\hough_eda\fig13_gradcam_s0_1.png
+저장: c:\Users\annan\OneDrive\바탕 화면\umm\runs\hough_eda\fig13_gradcam_s0_2.png
+저장: c:\Users\annan\OneDrive\바탕 화면\umm\runs\hough_eda\fig13_gradcam_s0_3.png
+저장: c:\Users\annan\OneDrive\바탕 화면\umm\runs\hough_eda\fig13_gradcam_s0_4.png

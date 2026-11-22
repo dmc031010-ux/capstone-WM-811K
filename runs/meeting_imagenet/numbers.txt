@@ -1,0 +1,26 @@
+== 학습 과정 (val macro F1, 100 epoch, lr 0.01 고정, seed 0) ==
+R34 ImageNet 초기화 처음 val ≥ 0.75: epoch 20 · 최고 val 0.790 (epoch 85) · 마지막 30 epoch val 평균 0.707 표준편차 0.082 · 1 epoch 손실 2.35 · 마지막 손실 0.049
+R34 무작위 초기화    처음 val ≥ 0.75: epoch 53 · 최고 val 0.784 (epoch 53) · 마지막 30 epoch val 평균 0.710 표준편차 0.049 · 1 epoch 손실 2.73 · 마지막 손실 0.051
+R18 무작위 초기화    처음 val ≥ 0.75: epoch 24 · 최고 val 0.805 (epoch 54) · 마지막 30 epoch val 평균 0.731 표준편차 0.060 · 1 epoch 손실 1.92 · 마지막 손실 0.034
+
+== 요약 ==
+R34 ImageNet 초기화 | 지도학습 100 ep | 0.815 | 0.964 | 0.790 | 0.450 | 0.744 | 85
+R34 무작위 초기화 | 지도학습 100 ep | 0.795 | 0.948 | 0.784 | 0.319 | 0.733 | 53
+R18 무작위 초기화 | 지도학습 100 ep | 0.800 | 0.966 | 0.805 | 0.439 | 0.724 | 54
+참고: ver8 seed 0 (R18) | 자기지도 사전학습 + fine-tune | 0.831 | 0.963 | 0.818 | 0.477 | 0.775 | 86
+참고: ver8 seed 1 (R18) | 자기지도 사전학습 + fine-tune | 0.783 | 0.952 | 0.795 | 0.444 | 0.706 | 31
+
+== 클래스별 F1 (test) ==
+R34 ImageNet 초기화 Center 0.904 Donut 0.832 Edge-Loc 0.762 Edge-Ring 0.965 Loc 0.733 Random 0.848 Scratch 0.450 Near-full 0.857 none 0.985
+R34 무작위 초기화    Center 0.876 Donut 0.832 Edge-Loc 0.701 Edge-Ring 0.936 Loc 0.668 Random 0.846 Scratch 0.319 Near-full 1.000 none 0.977
+R18 무작위 초기화    Center 0.912 Donut 0.780 Edge-Loc 0.739 Edge-Ring 0.948 Loc 0.720 Random 0.852 Scratch 0.439 Near-full 0.828 none 0.987
+
+== die 수 적은 (<1200) / 많은 (≥1200) 웨이퍼 (test) ==
+R34 ImageNet 초기화 적음: macro 0.784 · Scratch 23/61 · none 오탐 164 | 많음: macro 0.832 · Scratch 36/59 · none 오탐 108
+R34 무작위 초기화    적음: macro 0.766 · Scratch 19/61 · none 오탐 397 | 많음: macro 0.803 · Scratch 35/59 · none 오탐 152
+R18 무작위 초기화    적음: macro 0.751 · Scratch 10/61 · none 오탐 77 | 많음: macro 0.832 · Scratch 33/59 · none 오탐 70
+
+== 혼동행렬 주요 칸 (test) ==
+R34 ImageNet 초기화 Scratch 맞힘 59/120 · Scratch→none 37 · Scratch→Loc 16 · none 오탐 272
+R34 무작위 초기화    Scratch 맞힘 54/120 · Scratch→none 42 · Scratch→Loc 16 · none 오탐 549
+R18 무작위 초기화    Scratch 맞힘 43/120 · Scratch→none 56 · Scratch→Loc 14 · none 오탐 147
