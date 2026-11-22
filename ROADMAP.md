@@ -50,7 +50,7 @@ flowchart LR
 - [x] Frozen Probe(`analysis/probe.py`) 및 `seed 1` 복제로 사전학습 분리력·고정 LR 불안정성(`±0.0239`) 확인
 
 ### Phase 4. 파인튜닝 아키텍처 혁신 (`ver9.1` → `ver9.91`) ✅
-- [x] 어텐션 최적 위치 탐색 (`layer4/3/2` → `layer3 6×6` 확정)
+- [x] 어텐션 최적 위치 탐색 (`ver9.1A/B/C`: `layer4/3/2` → `layer3 6×6` 확정)
 - [x] **`ver9.7`** (`IterativeSpatialBeliefAttention` 3-step + `SpatialEvidencePooling` + 안정화 레시피): 2-seed `0.8395 ± 0.0016` + 6종 leave-one-out ablation (`a0~a5`)
 - [x] **`ver9.91`** (`+ OrientedLineBranch` + `hflip`): 2-seed **`0.8527 ± 0.0001`**, Scratch **`0.6777 ± 0.0000`**, 전 9개 클래스 동반 상승
 - [x] Forward Ablation (`ver9.9A`, `ver9.9B~B4`): `ver9.9B2` (`0.8479`, 순정 학습 100%)로 구조 시너지 입증

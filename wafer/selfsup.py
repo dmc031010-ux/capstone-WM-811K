@@ -1,4 +1,4 @@
-﻿"""ver3: 자기지도(SimCLR) → 군집화 → labeled 로 군집 이름 붙이기 → 미세조정 + 재군집 반복.
+"""ver3: 자기지도(SimCLR) → 군집화 → labeled 로 군집 이름 붙이기 → 미세조정 + 재군집 반복.
 
 발전 옵션: --v3_weight purity (군집 순도 가중치 + 순도 20% 미만 군집 제외), --v3_nopl (군집 pseudo-label 끔, ablation),
           --v3_multicrop (자기지도에 국소 crop view 추가), --v3_clusters K (군집 수)

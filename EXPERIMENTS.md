@@ -101,7 +101,7 @@ Stage 3의 진단으로 **"입력에는 선이 살아 있는데 ResNet-18 파인
 | 발견된 병목 | 도입한 해결책 | 적용 버전 | 실제 효과 |
 |---|---|---|---|
 | **① ResNet 초반 stride-2에서 1~2px `Scratch` 선 소실** | **`OrientedLineBranch`**: 96×96 anomaly 맵에 8방향 다중스케일(`9×9`, `15×15`) 선 필터 + 방향성 이방성(`max - mean`) + `MaxPool` 전용 스트림 | `ver9.9` → **`ver9.91`** | `Scratch` 정답 `58.5 → 82.0/120`, 미탐(`S→none`) `-45%` |
-| **② 좁은 수용영역으로 끊어진 선·전역 위치 맥락 부족** | **`IterativeSpatialBeliefAttention`**: `layer3(6×6)`에서 2D 상대위치 바이어스 + 9클래스 Belief를 3-step 반복 추론 (`ver9.1/9.5/9.6`으로 `layer3` 최적 위치 먼저 검증) | `ver9.7` → **`ver9.91`** | `S→Loc` 혼동 `-33%`, `Loc +4.8%p`, `Edge-Loc +4.5%p` |
+| **② 좁은 수용영역으로 끊어진 선·전역 위치 맥락 부족** | **`IterativeSpatialBeliefAttention`**: `layer3(6×6)`에서 2D 상대위치 바이어스 + 9클래스 Belief를 3-step 반복 추론 (`ver9.1A/B/C`로 `layer3` 최적 위치 먼저 검증) | `ver9.7` → **`ver9.91`** | `S→Loc` 혼동 `-33%`, `Loc +4.8%p`, `Edge-Loc +4.5%p` |
 | **③ `layer4(3×3)` `AvgPool`이 1~2칸 소형 결함을 정상 8칸에 희석** | **`SpatialEvidencePooling`**: 0-초기화 Gated Attention 풀링으로 결함 칸에만 집중, 정상 웨이퍼는 균등 평균 유지 | `ver9.7`, `ver9.9B2`, **`ver9.91`** | `ver9.9B→B2`에서 `none→Scratch` 오탐 **`102 → 12건`(-88%)** |
 | **④ 1:1 샘플링 오탐 + 5% 라벨 과적합 + 회전만 증강** | **`sample_pow=0.35` + Label Smoothing(0.05) + `attn_wd=0.02` + Warmup/Cosine + `hflip`** | `ver9.7` → **`ver9.91`** | `none→defect` 오탐 절반 이하, **2-seed 편차 `±0.0239 → ±0.0001`** |
 
@@ -110,7 +110,7 @@ Stage 3의 진단으로 **"입력에는 선이 살아 있는데 ResNet-18 파인
 | 버전 | 구성 요약 (`ver7` 인코더 고정) | Test Macro F1 | Scratch F1 | 비고 |
 |---|---|---:|---:|---|
 | `ver7` (레퍼런스) | 기본 ResNet-18 + AvgPool + 1:1 샘플링 | `0.8074 ± 0.0239` *(2-seed)* | `0.4601` | 기준선 |
-| `ver9.1 / 9.5 / 9.6` | 단순 Spatial SA 위치 비교 (`layer4` / `3` / `2`) | `0.825` / `0.829` / `0.818` | `0.472` / `0.496` / `0.474` | `layer3` 최적 확정 |
+| `ver9.1A / 9.1B / 9.1C` | 단순 Spatial SA 위치 비교 (`layer4` / `3` / `2`) | `0.825` / `0.829` / `0.818` | `0.472` / `0.496` / `0.474` | `layer3` (`ver9.1B`) 최적 확정 |
 | `ver9.7` | `3-step Belief + EvidencePool + 레시피` | `0.8395 ± 0.0016` *(2-seed)* | `0.5484` | `a0~a5` 6종 ablation으로 전 요소 기여 입증 |
 | `ver9.8` | `ver9.7` + `layer2(12×12)` RelSpatialAttention | `0.8331 ± 0.0074` *(2-seed)* | `0.4688` | 기각 (`layer2` 과적합) |
 | `ver9.9A` / `9.9B` | `Line+pow` / `Line+Belief` (최소 조합 탐색) | `0.8285` / `0.8351` *(seed 0)* | `0.4809` / `0.5477` | 단독 캐리 없음 확인 |
