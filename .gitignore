@@ -26,3 +26,9 @@ __pycache__/
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# ---- Codex 실행 로그 (원문 stdout, 커밋 불필요) ----
+debate/**/*.log
+
+# ---- 토론용 외부 저장소 사본 (남의 코드, 커밋하지 않음) ----
+debate/**/peer_repo/
