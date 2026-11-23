@@ -1,0 +1,28 @@
+## 판정: 과장 — 파일럿 수치는 맞지만, 혼합 노이즈의 Scratch 강건성과 50 epoch 후보의 우위를 판단하기에는 근거가 부족하다.
+
+## 지적
+
+**R1. [중요] “val만 평가, test는 보지 않음”은 실행 기록과 맞지 않는다.** `eval_pilot.py`는 val 지표만 읽는다. 그러나 fine-tune의 `_Tracker`는 val 최고점이 갱신될 때마다 test를 평가하고 점수를 로그와 `metrics.json`에 남겼다. 체크포인트 갱신 조건은 val macro였고, 사람이 test 점수를 후보 선택에 사용했는지는 확인할 수 없다. 보고서에서 **val로 체크포인트를 선택했다**는 사실과 **학습 중 test 점수가 노출됐다**는 사실을 함께 명시하고, 후속 실행에서는 후보 확정까지 test 평가를 비활성화하라. [평가 코드](<C:/Users/annan/OneDrive/바탕 화면/umm/runs/y9.1_pilot/eval_pilot.py:93>) · [체크포인트 코드](<C:/Users/annan/OneDrive/바탕 화면/umm/wafer/engine.py:68>) · [③ 학습 로그](<C:/Users/annan/OneDrive/바탕 화면/umm/runs/log_y9.1c_p0.05_s0.txt:79>)
+
+**R2. [중요] ③과 ④ 모두 10 epoch 시점에서 2단계의 두 진행 기준에 미달한다.** y9의 val macro는 **0.818379**, ③은 **0.814606**, ④는 **0.802723**이다. y9 대비 ③은 **Donut −0.0595, Near-full −0.0427**, ④는 **Loc −0.0352**로 클래스별 허용 하락폭 0.03을 넘었다. ④의 Random도 **−0.0296**으로 경계에 가깝다. 소수 5개 평균으로는 이 차이가 가려진다. 또한 SSL cosine 학습률은 총 epoch에 맞춰 감쇠하므로 10 epoch 체크포인트를 50 epoch 스케줄의 중간 결과로 해석할 수 없다. 50 epoch 실험은 후보의 추가 검증이며, 진행 기준은 그 결과에 원래 정밀도로 적용하라. [y9 지표](<C:/Users/annan/OneDrive/바탕 화면/umm/runs/resnet18/p0.05/seed0/y9_ssl50_ft30/metrics.json:175>) · [③ 지표](<C:/Users/annan/OneDrive/바탕 화면/umm/runs/resnet18/p0.05/seed0/y9.1c_ssl10_ft30/metrics.json:187>) · [④ 지표](<C:/Users/annan/OneDrive/바탕 화면/umm/runs/resnet18/p0.05/seed0/y9.1d_ssl10_ft30/metrics.json:192>) · [SSL 스케줄](<C:/Users/annan/OneDrive/바탕 화면/umm/wafer/ver6.py:166>)
+
+**R3. [중요] 8%에서의 “Scratch 유지”는 같은 웨이퍼의 예측 유지율로 측정하지 않았다.** 파일럿 곡선은 격자가 96 이하인 실제 val Scratch **114장**에 난수 한 세트로 불량을 추가한 뒤, 강도별 Scratch 재현율을 계산한다. 8%에서 ④의 **22/114**와 ③의 **18/114**는 네 장 차이다. 어떤 웨이퍼가 Scratch 판정을 유지했거나 새로 얻었는지는 집계값으로 알 수 없다. 0단계에 있던 합성선, die 수 구간, `none` 대조군, 16% 평가도 파일럿 곡선에서 빠졌다. 기존 체크포인트로 이 평가를 반복하고, 같은 웨이퍼에서의 Scratch 점수 변화와 `Scratch→none/Loc` 전이, `none→Scratch` 오탐을 함께 보고하라. [파일럿 곡선 코드](<C:/Users/annan/OneDrive/바탕 화면/umm/runs/y9.1_pilot/eval_pilot.py:60>) · [파일럿 출력](<C:/Users/annan/OneDrive/바탕 화면/umm/runs/y9.1_pilot/eval_pilot.txt:14>) · [0단계 출력](<C:/Users/annan/OneDrive/바탕 화면/umm/runs/y9.1_step0/noise_sensitivity.txt:2>)
+
+**R4. [중요] 선형 probe의 결정성은 seed 간 재현성을 보장하지 않는다.** ④의 선형 probe 우위는 이 체크포인트에서 확인된다. ③→④의 macro는 **0.594→0.677**, Scratch F1은 **0.067→0.089**다. 반면 fine-tune 후 macro는 **−0.01188**, Scratch F1은 **−0.0573**이었다. 전체 val Scratch 119장에서 ③→④의 정분류는 **60→49**, `none` 오분류는 **39→60**, `Loc` 오분류는 **15→9**였다. y9의 두 seed 간 **val** macro 차이도 **0.02387**이지만, 이는 y9의 차이이며 ③과 ④의 짝비교 오차를 추정해 주지는 않는다. “이 seed에서 선형 분류 점수가 올랐다”로 결론을 좁히고, 같은 seed 안에서 ③·④의 차이를 다시 측정하라. [선형 probe 출력](<C:/Users/annan/OneDrive/바탕 화면/umm/runs/y9.1_pilot/eval_pilot.txt:14>) · [③ 혼동행렬](<C:/Users/annan/OneDrive/바탕 화면/umm/runs/resnet18/p0.05/seed0/y9.1c_ssl10_ft30/metrics.json:268>) · [④ 혼동행렬](<C:/Users/annan/OneDrive/바탕 화면/umm/runs/resnet18/p0.05/seed0/y9.1d_ssl10_ft30/metrics.json:273>) · [y9 seed 1 지표](<C:/Users/annan/OneDrive/바탕 화면/umm/runs/resnet18/p0.05/seed1/y9_ssl50_ft30/metrics.json:180>)
+
+**R5. [중요] ①→②에서 확인한 것은 마스킹 조건에서의 헤드 구성 변경 효과다.** ②는 projector를 추가하면서 predictor와 EMA 타깃 출력도 **512차원에서 128차원**으로 바꾼다. 따라서 Scratch F1 **0.4700→0.3373**은 이 구성 변경의 관측 결과다. 회전이나 노이즈 조건에서 projector의 효과를 분리하려면 해당 증강을 고정한 projector 없는 대조군이 필요하다. 같은 이유로 ①과 ②–④의 `z_std`는 차원 수가 다른 정규화 타깃에서 계산되므로 원값의 크기로 붕괴 여부를 비교하기 어렵다. [헤드 구현](<C:/Users/annan/OneDrive/바탕 화면/umm/wafer/ver6.py:34>) · [z_std 계산](<C:/Users/annan/OneDrive/바탕 화면/umm/wafer/ver6.py:216>) · [①·② 지표](<C:/Users/annan/OneDrive/바탕 화면/umm/runs/y9.1_pilot/eval_pilot.txt:2>)
+
+**R6. [경미] 8%·16% cosine 역전은 로그에서 확인되지만 원인은 미확인이다.** 코드에서는 `p` 순서대로 뷰를 쌓고 같은 축에서 cosine을 집계한다. 로그의 8%·16% 값은 epoch 1에 **0.7615 / 0.3861**, epoch 6에 **0.5807 / 0.5851**, epoch 10에 **0.5139 / 0.6036**이다. 고정된 표시 순서 오류보다는 학습 중 변화와 더 잘 맞지만, 보고서가 인용한 뷰별 불량 증가율 검사 출력은 확인하지 못했다. 손실도 뷰별 cosine을 직접 최적화하지 않고 predictor 출력 평균에 적용된다. 원인을 해석하려면 고정 표본에 회전과 die별 난수를 공유해 강도별 실제 불량 증가율과 cosine을 함께 기록하라. [뷰 생성](<C:/Users/annan/OneDrive/바탕 화면/umm/wafer/ver6.py:121>) · [손실 계산](<C:/Users/annan/OneDrive/바탕 화면/umm/wafer/ver6.py:99>) · [④ SSL 로그](<C:/Users/annan/OneDrive/바탕 화면/umm/runs/log_y9.1d_p0.05_s0.txt:6>)
+
+**R7. [경미] 처리량 저하는 확인되며, 원인과 점수 영향은 확인되지 않았다.** 네 조건의 epoch 2–10 평균은 **475.4–482.0초**였다. 로그에서 첫 epoch는 조건별 **274.9–313.7초**지만, 이 기록으로 SW Power Cap이 원인이었는지, 정상 처리량이 314초인지, 성능에 영향이 없었는지는 검증할 수 없다. 보고서에는 관측된 시간과 계측이 필요한 원인 설명을 구분해 적어라. [① SSL 로그](<C:/Users/annan/OneDrive/바탕 화면/umm/runs/log_y9.1a_p0.05_s0.txt:6>) · [③ SSL 로그](<C:/Users/annan/OneDrive/바탕 화면/umm/runs/log_y9.1c_p0.05_s0.txt:6>) · [④ SSL 로그](<C:/Users/annan/OneDrive/바탕 화면/umm/runs/log_y9.1d_p0.05_s0.txt:6>)
+
+## 이 결과로 말할 수 있는 것과 없는 것
+
+seed 0, SSL 10 epoch, 동일한 fine-tune 예산에서 **③은 파일럿 중 val macro와 Scratch F1이 가장 높았고, ④는 고정 인코더 선형 probe가 가장 높았다.** 저장된 지표에서 네 조건 모두 라벨 6,919장, SSL 표본 10만 장, fine-tune 90 epoch, `v3_nopl=true`를 확인했다. 이 결과만으로 혼합 노이즈의 일반적인 Scratch 강건성, 50 epoch에서의 순위, 프로젝트의 최종 test 목표 달성 여부는 판단할 수 없다. [파일럿 출력](<C:/Users/annan/OneDrive/바탕 화면/umm/runs/y9.1_pilot/eval_pilot.txt:2>) · [③ 실행 설정 및 지표](<C:/Users/annan/OneDrive/바탕 화면/umm/runs/resnet18/p0.05/seed0/y9.1c_ssl10_ft30/metrics.json:32>)
+
+## 다음에 꼭 확인할 것
+
+1. **추가 학습 전에** ③·④ 체크포인트의 val 잡음 진단을 보강한다. 동일 웨이퍼와 여러 노이즈 난수로 0–16%를 평가하고, die 수 구간별 Scratch 점수 변화와 오분류 전이를 짝지어 비교한다.
+2. **50 epoch 한 조건에만 예산을 쓴다면**, 프로젝트의 1차 지표인 fine-tune val macro를 기준으로 ③을 우선 검증할 근거가 있다. 실험 질문이 노이즈 추가의 효과라면 ③·④를 같은 스케줄로 비교해야 한다. 어느 쪽이든 후속 실행에서는 test 노출을 차단하고, 같은 seed의 y9 대비 val macro와 소수 5개 클래스별 하락폭을 모두 확인한다.
+
+파일은 수정하지 않았으며, 학습과 평가를 재실행하지 않고 저장된 지표·로그·코드를 검토했다.

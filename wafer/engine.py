@@ -68,15 +68,19 @@ class _Tracker:
     def step(self, epoch, train_log):
         val = evaluate(self.model, self.ds, self.ds.val, self.device)
         rec = dict(epoch=epoch, val_macro_f1=val["macro_f1"], **train_log)
-        if val["macro_f1"] > self.best:
+        improved = val["macro_f1"] > self.best
+        if improved:
             self.best = val["macro_f1"]
             torch.save(self.model.state_dict(), os.path.join(self.out_dir, "best.pt"))
-            test = evaluate(self.model, self.ds, self.ds.test, self.device)
-            self.result = dict(best_epoch=epoch, val=val, test=test)
-            rec["test_macro_f1"] = test["macro_f1"]
+            if getattr(self.args, "no_test", False):   # y9.2~: 학습 중 test 를 보지 않음 (best.pt 로 나중에 한 번만)
+                self.result = dict(best_epoch=epoch, val=val)
+            else:
+                test = evaluate(self.model, self.ds, self.ds.test, self.device)
+                self.result = dict(best_epoch=epoch, val=val, test=test)
+                rec["test_macro_f1"] = test["macro_f1"]
         self.history.append(rec)
         print(" ".join(f"{k}={v:.4f}" if isinstance(v, float) else f"{k}={v}" for k, v in rec.items())
-              + ("  *" if "test_macro_f1" in rec else ""), flush=True)
+              + ("  *" if improved else ""), flush=True)
         with open(os.path.join(self.out_dir, "metrics.json"), "w", encoding="utf-8") as f:
             json.dump(dict(args=vars(self.args), **self.extra, **self.result, history=self.history),
                       f, indent=2, ensure_ascii=False)

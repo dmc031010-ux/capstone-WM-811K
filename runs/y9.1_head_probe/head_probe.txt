@@ -1,0 +1,33 @@
+train 6919장 (Scratch 48), val 17295장 (Scratch 119)
+
+① 마스킹 10ep
+  fc 원본                  macro 0.803 | Scratch F1 0.470 재현 0.43 정밀 0.52 none→Scratch  33 | Near 0.86 Donu 0.85 Rand 0.85 Scra 0.47 Loc 0.69
+  L4 선형                  macro 0.820 | Scratch F1 0.490 재현 0.41 정밀 0.60 none→Scratch  23 | Near 0.79 Donu 0.83 Rand 0.87 Scra 0.49 Loc 0.73
+  L4 선형 balanced         macro 0.797 | Scratch F1 0.425 재현 0.51 정밀 0.36 none→Scratch  87 | Near 0.76 Donu 0.82 Rand 0.90 Scra 0.43 Loc 0.70
+  L4 프로토타입               macro 0.775 | Scratch F1 0.384 재현 0.58 정밀 0.29 none→Scratch 146 | Near 0.71 Donu 0.78 Rand 0.87 Scra 0.38 Loc 0.68
+  L3 선형                  macro 0.793 | Scratch F1 0.493 재현 0.43 정밀 0.58 none→Scratch  24 | Near 0.86 Donu 0.68 Rand 0.85 Scra 0.49 Loc 0.66
+  L3+L4 선형               macro 0.817 | Scratch F1 0.474 재현 0.42 정밀 0.54 none→Scratch  30 | Near 0.76 Donu 0.83 Rand 0.89 Scra 0.47 Loc 0.74
+
+③ 회전만 10ep
+  fc 원본                  macro 0.815 | Scratch F1 0.524 재현 0.50 정밀 0.55 none→Scratch  41 | Near 0.85 Donu 0.80 Rand 0.88 Scra 0.52 Loc 0.72
+  L4 선형                  macro 0.834 | Scratch F1 0.531 재현 0.47 정밀 0.61 none→Scratch  27 | Near 0.89 Donu 0.84 Rand 0.86 Scra 0.53 Loc 0.73
+  L4 선형 balanced         macro 0.816 | Scratch F1 0.479 재현 0.56 정밀 0.42 none→Scratch  82 | Near 0.86 Donu 0.85 Rand 0.87 Scra 0.48 Loc 0.69
+  L4 프로토타입               macro 0.797 | Scratch F1 0.378 재현 0.62 정밀 0.27 none→Scratch 184 | Near 0.80 Donu 0.81 Rand 0.88 Scra 0.38 Loc 0.70
+  L3 선형                  macro 0.786 | Scratch F1 0.492 재현 0.41 정밀 0.61 none→Scratch  21 | Near 0.85 Donu 0.68 Rand 0.82 Scra 0.49 Loc 0.66
+  L3+L4 선형               macro 0.833 | Scratch F1 0.555 재현 0.49 정밀 0.64 none→Scratch  24 | Near 0.85 Donu 0.84 Rand 0.86 Scra 0.56 Loc 0.75
+
+y9 50ep
+  fc 원본                  macro 0.818 | Scratch F1 0.446 재현 0.42 정밀 0.48 none→Scratch  43 | Near 0.89 Donu 0.86 Rand 0.87 Scra 0.45 Loc 0.72
+  L4 선형                  macro 0.818 | Scratch F1 0.442 재현 0.35 정밀 0.59 none→Scratch  19 | Near 0.85 Donu 0.86 Rand 0.85 Scra 0.44 Loc 0.72
+  L4 선형 balanced         macro 0.820 | Scratch F1 0.451 재현 0.48 정밀 0.43 none→Scratch  60 | Near 0.89 Donu 0.88 Rand 0.87 Scra 0.45 Loc 0.70
+  L4 프로토타입               macro 0.770 | Scratch F1 0.321 재현 0.61 정밀 0.22 none→Scratch 232 | Near 0.75 Donu 0.77 Rand 0.88 Scra 0.32 Loc 0.64
+  L3 선형                  macro 0.802 | Scratch F1 0.479 재현 0.39 정밀 0.63 none→Scratch  15 | Near 0.81 Donu 0.79 Rand 0.87 Scra 0.48 Loc 0.68
+  L3+L4 선형               macro 0.819 | Scratch F1 0.461 재현 0.37 정밀 0.61 none→Scratch  20 | Near 0.85 Donu 0.86 Rand 0.85 Scra 0.46 Loc 0.72
+
+SimCLR 50ep
+  fc 원본                  macro 0.820 | Scratch F1 0.553 재현 0.53 정밀 0.58 none→Scratch  28 | Near 0.86 Donu 0.83 Rand 0.87 Scra 0.55 Loc 0.72
+  L4 선형                  macro 0.829 | Scratch F1 0.559 재현 0.48 정밀 0.67 none→Scratch  17 | Near 0.85 Donu 0.81 Rand 0.84 Scra 0.56 Loc 0.73
+  L4 선형 balanced         macro 0.822 | Scratch F1 0.571 재현 0.54 정밀 0.61 none→Scratch  27 | Near 0.81 Donu 0.79 Rand 0.87 Scra 0.57 Loc 0.74
+  L4 프로토타입               macro 0.808 | Scratch F1 0.507 재현 0.64 정밀 0.42 none→Scratch  82 | Near 0.84 Donu 0.78 Rand 0.90 Scra 0.51 Loc 0.70
+  L3 선형                  macro 0.817 | Scratch F1 0.589 재현 0.51 정밀 0.69 none→Scratch  13 | Near 0.81 Donu 0.72 Rand 0.90 Scra 0.59 Loc 0.71
+  L3+L4 선형               macro 0.824 | Scratch F1 0.534 재현 0.46 정밀 0.63 none→Scratch  19 | Near 0.81 Donu 0.80 Rand 0.86 Scra 0.53 Loc 0.73
