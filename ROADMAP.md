@@ -61,7 +61,10 @@ flowchart LR
 - [x] 단일 변경 통제 실험 2차 완료: `ver9.5D` (VICReg: `0.8175`), `ver9.5E` (Debiased InfoNCE: `0.8115`, Scratch `0.4878`), `ver9.5F` (경량 Projector `231K`: `0.8165`, Loc `0.7275`)
 - [x] 반발력 + Projector 결합 실험 완료 (`ver9.6A_B2`: Test `0.8525` / Val `0.8387`, `ver9.6B_B2`: Test `0.8379` / Scratch TP `89/120`, `ver3_B2`: Test `0.8640`)
 - [x] **`Line` 필터 4종 최적화 완료 (`ver9.7A~D` 순정 & `_B2`)**: 학습형 커널 **`ver9.7B_B2` (Test `0.8598`, Val `0.8427`)**, 다이 크기 보간 **`ver9.7C_B2` (Scratch F1 `0.6891` 역대 1위)**, AvgPool 피라미드 **`ver9.7D_B2` (Scratch `0.6639`)** 달성!
-- [ ] **`Belief` (3-step 어텐션) 최적화** 및 `Line` 승자 조합 → **`ver9.4_simclr` / `ver3_B2` (`0.864~0.867`) 정면 돌파 확인**
+- [x] **`Belief`(`ver9.8x`) & `Pool`(`ver9.9x`) 단독 5종 + 올스타 조합(`ver9.8_star1~6`) 완료**:
+  - `Belief` 1위: **`ver9.8C` (`temp_ent`)** (`0.8348`, `S=0.4880`), `Pool` 1위: `ver9.9D` (`0.8325`) / `ver9.9B` (`S=0.4936`) / `ver9.90` (`Val 0.8147`)
+  - 3모듈 결합: **`ver9.7B_B2`** (Test 1위 **`0.8598`**), **`ver9.8_star3`** (**Val 1위 `0.8448`**, Scratch **`0.6866` / TP `92/120`**), **`ver9.8_star5`** (`Loc 0.7524`·`EL 0.8088` 최고)
+- [ ] (`Near-full` 엔트로피 보정 및) `ver9.7B_B2` / `ver9.8_star3` / `ver9.8_star5`에 `ver9.4` 레시피(`pow=0.35`, `hflip`, `cosine`) 또는 노이즈 복원 SSL(`k10.1`) 결합 → **`ver3_B2` (`0.8640`) / `ver9.4_simclr` (`0.8674`) 정면 돌파 확인**
 - [ ] 마스킹 대신 노이즈 복원 SSL(`k10.1`)로 `none→Scratch` 오탐(`58~63건 → ≤24건`) 해소
 
 ### Phase 6. 최종 검증 및 리포트 완성 📋

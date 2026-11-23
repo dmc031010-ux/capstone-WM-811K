@@ -80,12 +80,15 @@ def _layer_out_channels(layer):
 class IterativeSpatialBeliefAttention(nn.Module):
     """ver9.7: 2D 상대 위치 연속성 + 자리별 클래스 belief 점등 + 가중치 공유 반복 추론(3-step).
 
-    - X/Y 상대 거리 (dx, dy) 기반 Relative Position Bias 로 회전·이동에 강건한 선형 연속성 포착
-    - 각 공간 칸(6x6)마다 9개 클래스 belief 분포에 불을 켜고(softmax), 3회 반복하며 후보를 좁혀나감
-    - 단계별 ReZero 0-초기화 게이트로 0스텝에서 사전학습 ver7 특징을 100% 보존
+    mode:
+      base        : 기존 3-step 반복 추론
+      topk_gate   : ver9.8A - receiver gate(2*sigmoid) + Top-6 칸 보조손실(빈칸 오염 방지)
+      radial_geom : ver9.8B - 중심 거리 r 임베딩 + 쌍별 기하 바이어스 (d_ij, |dr|, mean_r)
+      temp_ent    : ver9.8C - 스텝별 온도 냉각 (2.0->1.0->0.5) + 엔트로피 기반 업데이트 게이팅
+      consensus   : ver9.8D - 3x3 이웃 평균 로짓 합의 업데이트로 고립 오탐 억제
     """
 
-    def __init__(self, in_dim=256, num_classes=9, h=6, w=6, num_heads=4, num_steps=3, dropout=0.1):
+    def __init__(self, in_dim=256, num_classes=9, h=6, w=6, num_heads=4, num_steps=3, dropout=0.1, mode="base"):
         super().__init__()
         if in_dim % num_heads != 0:
             raise ValueError(f"in_dim({in_dim}) must be divisible by num_heads({num_heads})")
@@ -96,6 +99,7 @@ class IterativeSpatialBeliefAttention(nn.Module):
         self.head_dim = in_dim // num_heads
         self.scale = self.head_dim ** -0.5
         self.num_steps = num_steps
+        self.mode = mode
 
         # 2D Relative Position Bias table: (num_heads, (2h-1)*(2w-1))
         self.rel_pos_bias = nn.Parameter(torch.zeros(num_heads, (2 * h - 1) * (2 * w - 1)))
@@ -108,6 +112,22 @@ class IterativeSpatialBeliefAttention(nn.Module):
         self.cell_gate = nn.Linear(in_dim, 1)
         nn.init.zeros_(self.cell_gate.weight)
         nn.init.zeros_(self.cell_gate.bias)
+
+        if mode == "radial_geom":
+            rf, pg = self._build_geom(h, w)
+            self.register_buffer("rad_feat", rf, persistent=False)
+            self.register_buffer("pair_geom", pg, persistent=False)
+            self.rad_proj = nn.Linear(2, in_dim)
+            nn.init.zeros_(self.rad_proj.weight)
+            nn.init.zeros_(self.rad_proj.bias)
+            self.geom_bias = nn.Sequential(nn.Linear(3, 16), nn.GELU(), nn.Linear(16, num_heads))
+            nn.init.zeros_(self.geom_bias[-1].weight)
+            nn.init.zeros_(self.geom_bias[-1].bias)
+        elif mode == "consensus":
+            self.consensus_scale = nn.Parameter(torch.tensor(0.25))
+            nk = torch.ones(1, 1, 3, 3) / 8.0
+            nk[0, 0, 1, 1] = 0.0
+            self.register_buffer("neigh_kernel", nk.repeat(num_classes, 1, 1, 1), persistent=False)
 
         # Weight-shared Relative Multi-Head Self-Attention
         self.norm1 = nn.LayerNorm(in_dim)
@@ -124,10 +144,24 @@ class IterativeSpatialBeliefAttention(nn.Module):
         self.ffn_drop = nn.Dropout(dropout)
         self.ffn_fc2 = nn.Linear(in_dim * 2, in_dim)
 
-        # 단계별 LayerScale 소값 초기화 (0.05): 사전학습 특징을 해치지 않으면서 1스텝부터 rel_pos_bias·belief_proj 로 충분한 그래디언트 전달
         self.attn_scales = nn.Parameter(torch.full((num_steps,), 0.05))
         self.ffn_scales = nn.Parameter(torch.full((num_steps,), 0.05))
         self.last_step_logits = None
+
+    @staticmethod
+    def _build_geom(h, w, device=None):
+        cy = (torch.arange(h, device=device, dtype=torch.float32) - (h - 1) / 2.0) / max(1.0, (h - 1) / 2.0)
+        cx = (torch.arange(w, device=device, dtype=torch.float32) - (w - 1) / 2.0) / max(1.0, (w - 1) / 2.0)
+        gy, gx = torch.meshgrid(cy, cx, indexing="ij")
+        coords = torch.stack((gy.flatten(), gx.flatten()), dim=1)  # (N, 2)
+        r = torch.sqrt((coords ** 2).sum(dim=1) / 2.0).clamp(0.0, 1.0)  # (N,)
+        rad_feat = torch.stack((r, r ** 2), dim=1).unsqueeze(0)  # (1, N, 2)
+        diff = coords[:, None, :] - coords[None, :, :]
+        dij = torch.sqrt((diff ** 2).sum(dim=-1) / 8.0).clamp(0.0, 1.0)
+        dr = (r[:, None] - r[None, :]).abs()
+        mr = 0.5 * (r[:, None] + r[None, :])
+        pair_geom = torch.stack((dij, dr, mr), dim=-1)  # (N, N, 3)
+        return rad_feat, pair_geom
 
     @staticmethod
     def _build_rel_idx(h, w, device=None):
@@ -142,12 +176,18 @@ class IterativeSpatialBeliefAttention(nn.Module):
     def _get_rel_bias(self, H, W, device, dtype):
         if H == self.h and W == self.w:
             bias = self.rel_pos_bias[:, self.rel_pos_idx]  # (heads, N, N)
+            pg = self.pair_geom if self.mode == "radial_geom" else None
         else:
             table = self.rel_pos_bias.view(1, self.num_heads, 2 * self.h - 1, 2 * self.w - 1)
             table = F.interpolate(table, size=(2 * H - 1, 2 * W - 1), mode="bicubic", align_corners=False)
             idx = self._build_rel_idx(H, W, device=device)
             bias = table.view(self.num_heads, -1)[:, idx]
-        return bias.unsqueeze(0).to(dtype=dtype)  # (1, heads, N, N)
+            pg = self._build_geom(H, W, device=device)[1] if self.mode == "radial_geom" else None
+        out = bias.unsqueeze(0).to(dtype=dtype)
+        if pg is not None:
+            gb = self.geom_bias(pg.to(dtype=self.geom_bias[0].weight.dtype)).permute(2, 0, 1).unsqueeze(0).to(dtype=dtype)
+            out = out + gb
+        return out
 
     def _rel_mha(self, x, H, W):
         B, N, C = x.shape
@@ -167,24 +207,56 @@ class IterativeSpatialBeliefAttention(nn.Module):
         h = self.ffn_drop(self.ffn_act(h))
         return self.ffn_fc2(h)
 
+    def _apply_consensus(self, cell_logits, B, H, W):
+        cl_2d = cell_logits.float().transpose(1, 2).reshape(B, self.num_classes, H, W)
+        nk = self.neigh_kernel.to(device=cl_2d.device, dtype=torch.float32)
+        neigh_l = F.conv2d(cl_2d, nk, padding=1, groups=self.num_classes).flatten(2).transpose(1, 2)
+        return cell_logits.float() + self.consensus_scale.float() * neigh_l
+
     def forward(self, x):
         B, C, H, W = x.shape
         tokens = x.flatten(2).transpose(1, 2)  # (B, H*W, C)
         step_logits = [] if self.training else None
+        rf = None
+        if self.mode == "radial_geom":
+            rf = self.rad_feat if (H == self.h and W == self.w) else self._build_geom(H, W, device=x.device)[0]
+            rf = self.rad_proj(rf.to(dtype=self.rad_proj.weight.dtype)).to(tokens.dtype)
+        taus = (2.0, 1.0, 0.5)
 
         for step in range(self.num_steps):
             bn = self.belief_norm(tokens)
             cell_logits = self.belief_head(bn)  # (B, N, num_classes)
-            belief = F.softmax(cell_logits.float(), dim=-1).to(tokens.dtype)
+            if self.mode == "consensus":
+                cell_logits = self._apply_consensus(cell_logits, B, H, W).to(tokens.dtype)
+            tau = taus[min(step, 2)] if self.mode == "temp_ent" else 1.0
+            belief_f = F.softmax(cell_logits.float() / tau, dim=-1)
+            belief = belief_f.to(tokens.dtype)
             ctx_in = self.norm1(tokens) + self.belief_proj(belief)
+            if rf is not None:
+                ctx_in = ctx_in + rf
             attn_out = self._rel_mha(ctx_in, H, W)
+            if self.mode == "topk_gate":
+                attn_out = attn_out * (2.0 * torch.sigmoid(self.cell_gate(bn)))
+            elif self.mode == "temp_ent":
+                ent = -(belief_f * (belief_f + 1e-8).log()).sum(dim=-1, keepdim=True) / math.log(self.num_classes)
+                attn_out = attn_out * (0.5 + ent).to(tokens.dtype)
             tokens = tokens + self.attn_scales[step] * self.drop(attn_out)
             tokens = tokens + self.ffn_scales[step] * self.drop(self._conv_ffn(self.norm2(tokens), H, W))
             if step_logits is not None:
                 post_bn = self.belief_norm(tokens)
                 post_logits = self.belief_head(post_bn).float()
-                w = F.softmax(self.cell_gate(post_bn).float(), dim=1)
-                step_logits.append((post_logits * w).sum(dim=1))
+                if self.mode == "consensus":
+                    post_logits = self._apply_consensus(post_logits, B, H, W)
+                gate_raw = self.cell_gate(post_bn).float()
+                if self.mode == "topk_gate":
+                    k_top = min(6, gate_raw.shape[1])
+                    top_s, top_idx = gate_raw.squeeze(-1).topk(k_top, dim=1)
+                    top_l = torch.gather(post_logits, 1, top_idx.unsqueeze(-1).expand(-1, -1, self.num_classes))
+                    w = F.softmax(top_s, dim=1).unsqueeze(-1)
+                    step_logits.append((top_l * w).sum(dim=1))
+                else:
+                    w = F.softmax(gate_raw, dim=1)
+                    step_logits.append((post_logits * w).sum(dim=1))
 
         self.last_step_logits = step_logits
         return tokens.transpose(1, 2).reshape(B, C, H, W)
@@ -278,6 +350,9 @@ class OrientedLineBranch(nn.Module):
             init = torch.log(torch.tensor([0.14, 0.35, 0.18, 0.75]))
             self.log_p9 = nn.Parameter(init.clone())
             self.log_p15 = nn.Parameter(init.clone())
+        elif mode == "pyr_avg_learn":
+            init = torch.log(torch.tensor([0.14, 0.35, 0.18, 0.75]))
+            self.log_p9_pyr = nn.Parameter(init.unsqueeze(0).repeat(3, 1).clone())
         self.net = nn.Sequential(
             nn.Conv2d(6, 24, 3, padding=1, bias=False),
             nn.BatchNorm2d(24),
@@ -365,9 +440,9 @@ class OrientedLineBranch(nn.Module):
             max9, aniso9 = self._resp(anom, wafer, kk9)
             max15, aniso15 = self._resp(anom, wafer, kk15)
             feats = torch.cat((defect, anom, max9, aniso9, max15, aniso15), dim=1)
-        elif self.mode in ("pyr_max", "pyr_avg"):
+        elif self.mode in ("pyr_max", "pyr_avg", "pyr_avg_learn"):
             mx_all, ans = [], []
-            for f in (1, 2, 3):
+            for idx, f in enumerate((1, 2, 3)):
                 if f == 1:
                     d_s, w_s = defect, wafer
                 elif self.mode == "pyr_max":
@@ -375,7 +450,12 @@ class OrientedLineBranch(nn.Module):
                 else:
                     d_s, w_s = F.avg_pool2d(defect, f, f), (F.avg_pool2d(wafer, f, f) > 0.5).to(x.dtype)
                 a_s = self._anom(d_s, w_s)
-                mx, an = self._resp(a_s, w_s, k9)
+                if self.mode == "pyr_avg_learn":
+                    p = torch.exp(self.log_p9_pyr[idx])
+                    k_s = self._kernel_from_params(9, p[0], p[1], p[2], p[3]).to(x.dtype)
+                else:
+                    k_s = k9
+                mx, an = self._resp(a_s, w_s, k_s)
                 if f > 1:
                     mx = F.interpolate(mx, size=(H, W), mode="bilinear", align_corners=False) * wafer
                     an = F.interpolate(an, size=(H, W), mode="bilinear", align_corners=False) * wafer
@@ -402,11 +482,17 @@ class OrientedLineBranch(nn.Module):
 class SpatialEvidencePooling(nn.Module):
     """ver9.7: 균등 AvgPool 대신 결함 신호가 켜진 공간 칸에 가중치를 집중하는 어텐션 풀링.
 
-    마지막 선형층을 0으로 초기화해 0스텝에서는 정확한 AdaptiveAvgPool2d 와 동일하게 시작.
+    mode:
+      base      : 기존 0-초기화 gated pooling
+      multitemp : ver9.8PA - 3온도(0.25, 1.0, 4.0) 병렬 게이트 + 채널별 가중 결합
+      radial    : ver9.8PB - 3x3 중심/모서리/꼭짓점 위치 임베딩(0-초기화) 추가
+      contrast  : ver9.8PC - 전경(fg) - 배경(bg) 대비 residual 추가 (0-초기화)
+      peak      : ver9.8PD - (max - mean) 피크 잔차 추가 (0-초기화)
     """
 
-    def __init__(self, in_dim=512, hidden_dim=128, dropout=0.1):
+    def __init__(self, in_dim=512, hidden_dim=128, dropout=0.1, mode="base"):
         super().__init__()
+        self.mode = mode
         self.norm = nn.LayerNorm(in_dim)
         self.gate = nn.Sequential(
             nn.Linear(in_dim, hidden_dim),
@@ -416,13 +502,45 @@ class SpatialEvidencePooling(nn.Module):
         )
         nn.init.zeros_(self.gate[-1].weight)
         nn.init.zeros_(self.gate[-1].bias)
+        if mode == "multitemp":
+            self.multi_gate = nn.Linear(hidden_dim, 3)
+            nn.init.zeros_(self.multi_gate.weight)
+            nn.init.zeros_(self.multi_gate.bias)
+            self.head_mix = nn.Parameter(torch.zeros(3, in_dim))
+        elif mode == "radial":
+            self.register_buffer("zone_idx", torch.tensor([2, 1, 2, 1, 0, 1, 2, 1, 2], dtype=torch.long), persistent=False)
+            self.zone_emb = nn.Parameter(torch.zeros(3, in_dim))
+        elif mode == "contrast":
+            self.contrast_scale = nn.Parameter(torch.tensor(0.0))
+        elif mode == "peak":
+            self.peak_scale = nn.Parameter(torch.zeros(1, in_dim))
 
     def forward(self, x):
         B, C, H, W = x.shape
         tokens = x.flatten(2).transpose(1, 2)  # (B, H*W, C)
-        scores = self.gate(self.norm(tokens)).float()  # (B, H*W, 1)
+        if self.mode == "radial" and H == 3 and W == 3:
+            tokens = tokens + self.zone_emb[self.zone_idx].unsqueeze(0).to(tokens.dtype)
+        norm_t = self.norm(tokens)
+        if self.mode == "multitemp":
+            h_g = self.gate[:-1](norm_t)
+            scores3 = self.multi_gate(h_g).float()  # (B, N, 3)
+            ps = []
+            for idx, tau in enumerate((0.25, 1.0, 4.0)):
+                wk = F.softmax(scores3[..., idx:idx + 1] / tau, dim=1).to(x.dtype)
+                ps.append((tokens * wk).sum(dim=1))
+            mix = F.softmax(self.head_mix, dim=0).unsqueeze(1).to(x.dtype)
+            pooled = (torch.stack(ps, dim=0) * mix).sum(dim=0)
+            return pooled.unsqueeze(-1).unsqueeze(-1)
+        scores = self.gate(norm_t).float()  # (B, H*W, 1)
         weights = F.softmax(scores, dim=1).to(x.dtype)
         pooled = (tokens * weights).sum(dim=1)  # (B, C)
+        if self.mode == "contrast":
+            bg_w = F.softmax(-scores, dim=1).to(x.dtype)
+            bg = (tokens * bg_w).sum(dim=1)
+            pooled = pooled + self.contrast_scale.to(x.dtype) * (pooled - bg)
+        elif self.mode == "peak":
+            peak = tokens.max(dim=1).values - tokens.mean(dim=1)
+            pooled = pooled + self.peak_scale.to(x.dtype) * peak
         return pooled.unsqueeze(-1).unsqueeze(-1)
 
 
@@ -621,6 +739,43 @@ def build_model(arch, num_classes, in_ch=1):
 
             m.forward_features = _forward_features_v99
             m._forward_impl = _forward_impl_v99
+        elif isinstance(USE_SA, tuple) and len(USE_SA) == 4 and USE_SA[0] == "combo":
+            _, l_m, b_m, p_m = USE_SA
+            dim3 = _layer_out_channels(m.layer3)
+            if l_m is not None:
+                m.line_branch = OrientedLineBranch(out_dim=dim3, dropout=0.1, mode=l_m)
+                m.line_scale = nn.Parameter(torch.tensor(0.05))
+            if b_m is not None:
+                m.layer3_sa = IterativeSpatialBeliefAttention(
+                    in_dim=dim3, num_classes=num_classes, h=6, w=6, num_heads=4, num_steps=3, dropout=0.1, mode=b_m
+                )
+            if p_m is not None:
+                m.avgpool = SpatialEvidencePooling(in_dim=m.fc.in_features, hidden_dim=128, dropout=0.1, mode=p_m)
+
+            def _forward_features_combo(x):
+                f_line = m.line_branch(x) if hasattr(m, "line_branch") else None
+                h = m.conv1(x)
+                h = m.bn1(h)
+                h = m.relu(h)
+                h = m.maxpool(h)
+                h = m.layer1(h)
+                h = m.layer2(h)
+                h = m.layer3(h)
+                if f_line is not None:
+                    if f_line.shape[-2:] != h.shape[-2:]:
+                        f_line = F.adaptive_max_pool2d(f_line, h.shape[-2:])
+                    h = h + m.line_scale * f_line
+                if hasattr(m, "layer3_sa"):
+                    h = m.layer3_sa(h)
+                h = m.layer4(h)
+                h = m.avgpool(h)
+                return torch.flatten(h, 1)
+
+            def _forward_impl_combo(x):
+                return m.fc(_forward_features_combo(x))
+
+            m.forward_features = _forward_features_combo
+            m._forward_impl = _forward_impl_combo
         else:
             raise ValueError(f"Unsupported USE_SA={USE_SA!r}")
     return m

@@ -189,27 +189,38 @@ def finetune(ds, lab_idx, sub, enc_path, args, out_dir, device):
     actual_missing = set(missing.missing_keys)
     sa_mode = getattr(wmodels, "USE_SA", False)
     if sa_mode:
-        sa_prefixes = {
-            "layer3": ("layer3.sa.",),
-            "layer2": ("layer2.sa.",),
-            "ver9.7": ("layer3.sa.", "avgpool."),
-            "ver9.7_1step": ("layer3.sa.", "avgpool."),
-            "ver9.7_belief": ("layer3.sa.",),
-            "ver9.7_pool": ("avgpool.",),
-            "ver9.8": ("layer2.sa.", "layer3.sa.", "avgpool."),
-            "ver9.9": ("line_branch.", "line_scale", "layer3_sa.", "avgpool."),
-            "ver9.9_pyr_max": ("line_branch.", "line_scale", "layer3_sa.", "avgpool."),
-            "ver9.9_pyr_avg": ("line_branch.", "line_scale", "layer3_sa.", "avgpool."),
-            "ver9.9_learn": ("line_branch.", "line_scale", "layer3_sa.", "avgpool."),
-            "ver9.9_scale": ("line_branch.", "line_scale", "layer3_sa.", "avgpool."),
-            "ver9.9A": ("line_branch.", "line_scale"),
-            "ver9.9A_pyr_max": ("line_branch.", "line_scale"),
-            "ver9.9A_pyr_avg": ("line_branch.", "line_scale"),
-            "ver9.9A_learn": ("line_branch.", "line_scale"),
-            "ver9.9A_scale": ("line_branch.", "line_scale"),
-            "ver9.9B": ("line_branch.", "line_scale", "layer3_sa."),
-            "ver9.9C": ("line_branch.", "line_scale", "avgpool."),
-        }.get(sa_mode, ("avgpool.0.",))
+        if isinstance(sa_mode, tuple) and len(sa_mode) == 4 and sa_mode[0] == "combo":
+            _, l_m, b_m, p_m = sa_mode
+            prefixes = []
+            if l_m is not None:
+                prefixes.extend(["line_branch.", "line_scale"])
+            if b_m is not None:
+                prefixes.append("layer3_sa.")
+            if p_m is not None:
+                prefixes.append("avgpool.")
+            sa_prefixes = tuple(prefixes)
+        else:
+            sa_prefixes = {
+                "layer3": ("layer3.sa.",),
+                "layer2": ("layer2.sa.",),
+                "ver9.7": ("layer3.sa.", "avgpool."),
+                "ver9.7_1step": ("layer3.sa.", "avgpool."),
+                "ver9.7_belief": ("layer3.sa.",),
+                "ver9.7_pool": ("avgpool.",),
+                "ver9.8": ("layer2.sa.", "layer3.sa.", "avgpool."),
+                "ver9.9": ("line_branch.", "line_scale", "layer3_sa.", "avgpool."),
+                "ver9.9_pyr_max": ("line_branch.", "line_scale", "layer3_sa.", "avgpool."),
+                "ver9.9_pyr_avg": ("line_branch.", "line_scale", "layer3_sa.", "avgpool."),
+                "ver9.9_learn": ("line_branch.", "line_scale", "layer3_sa.", "avgpool."),
+                "ver9.9_scale": ("line_branch.", "line_scale", "layer3_sa.", "avgpool."),
+                "ver9.9A": ("line_branch.", "line_scale"),
+                "ver9.9A_pyr_max": ("line_branch.", "line_scale"),
+                "ver9.9A_pyr_avg": ("line_branch.", "line_scale"),
+                "ver9.9A_learn": ("line_branch.", "line_scale"),
+                "ver9.9A_scale": ("line_branch.", "line_scale"),
+                "ver9.9B": ("line_branch.", "line_scale", "layer3_sa."),
+                "ver9.9C": ("line_branch.", "line_scale", "avgpool."),
+            }.get(sa_mode, ("avgpool.0.",))
         assert actual_missing - expected_missing == {k for k in actual_missing if k.startswith(sa_prefixes)}, missing
     else:
         assert actual_missing == expected_missing, missing
