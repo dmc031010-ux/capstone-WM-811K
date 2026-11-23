@@ -59,8 +59,10 @@ flowchart LR
 - [x] 공정 대조 실험 (`ver9.4_simclr` SimCLR `0.8674` vs `ver9.4` `0.8526`): **`Scratch` 우리 우위(`+1.92%p`)**, `Donut/Loc/Center` 열세 원인(Projector·반발력 부재) 특정
 - [x] 단일 변경 통제 실험 1차 완료: `ver9.5A` (`hflip`: `0.8099`), `ver9.5B` (Masked InfoNCE: `0.8168`), `ver9.5C` (Uniformity: `0.8240`)
 - [x] 단일 변경 통제 실험 2차 완료: `ver9.5D` (VICReg: `0.8175`), `ver9.5E` (Debiased InfoNCE: `0.8115`, Scratch `0.4878`), `ver9.5F` (경량 Projector `231K`: `0.8165`, Loc `0.7275`)
-- [ ] 반발력 + Projector 결합 실험 (`ver9.6A` Masked InfoNCE+Proj, `ver9.6B` Uniformity+Proj — 순정 FT & `ver9.4B2` 3모듈 FT, `ver3_B2` 대조) *(야간 실행 중)*
-- [ ] 신규 사전학습 체크포인트 + `ver9.4` 파인튜닝으로 **`ver9.4_simclr` (`0.8674`) 정면 돌파 확인**
+- [x] 반발력 + Projector 결합 실험 완료 (`ver9.6A_B2`: Test `0.8525` / Val `0.8387`, `ver9.6B_B2`: Test `0.8379` / Scratch TP `89/120`, `ver3_B2`: Test `0.8640`)
+- [x] **`Line` 필터 4종 최적화 완료 (`ver9.7A~D` 순정 & `_B2`)**: 학습형 커널 **`ver9.7B_B2` (Test `0.8598`, Val `0.8427`)**, 다이 크기 보간 **`ver9.7C_B2` (Scratch F1 `0.6891` 역대 1위)**, AvgPool 피라미드 **`ver9.7D_B2` (Scratch `0.6639`)** 달성!
+- [ ] **`Belief` (3-step 어텐션) 최적화** 및 `Line` 승자 조합 → **`ver9.4_simclr` / `ver3_B2` (`0.864~0.867`) 정면 돌파 확인**
+- [ ] 마스킹 대신 노이즈 복원 SSL(`k10.1`)로 `none→Scratch` 오탐(`58~63건 → ≤24건`) 해소
 
 ### Phase 6. 최종 검증 및 리포트 완성 📋
 - [x] 남은 구조 ablation 1종 완료: **`ver9.4C` (`Line + Pool`, `Belief` 제거: `0.8274`, Scratch `0.5263`)** + **`ver9.4B2` 2-seed 검증 (`0.8468 ± 0.0011`)** → 3각 시너지 최종 확정!

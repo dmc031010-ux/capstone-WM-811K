@@ -1,3 +1,4 @@
+import math
 import os
 
 import numpy as np
@@ -258,12 +259,25 @@ class OrientedLineBranch(nn.Module):
     - 웨이퍼 내부 평균 불량 밀도를 제거한 anomaly 맵에 다중 스케일(9x9, 15x15) 8방향 zero-mean 선형 필터 적용
     - 회전 불변 방향성 이방성(max - mean)으로 등방성 랜덤 노이즈(none)와 뭉친 결함(Loc)을 억제하고 얇은 선(Scratch)만 강조
     - stride-2 평균 희석 대신 MaxPool2d(2)로 96→48→24→12→6 까지 1~2px 선형 피크 신호를 보존
+
+    mode (ver9.7 필터 변형, 모두 self.net 입력은 6채널로 동일):
+      base      : k9 + k15 (기존)
+      pyr_max   : 해법 A  - MaxPool 피라미드 (96/48/32) + 단일 k9
+      pyr_avg   : 신규    - AvgPool 피라미드 (96/48/32) + 단일 k9 (최근접 업샘플링의 역연산)
+      learn     : 해법 B  - 폭/억제날개/길이(sigma_v, v0, sigma_neg, sigma_u)를 학습 파라미터로
+      scale     : 해법 C  - 웨이퍼별 die 블록 크기 s 추정 → k9 을 dilation 1/2/3 으로 찍고 s 로 선형 보간
     """
 
-    def __init__(self, out_dim=256, dropout=0.1):
+    def __init__(self, out_dim=256, dropout=0.1, mode="base"):
         super().__init__()
+        self.mode = mode
         self.register_buffer("k9", self._make_oriented_kernels(9, n_ori=8), persistent=False)
         self.register_buffer("k15", self._make_oriented_kernels(15, n_ori=8), persistent=False)
+        if mode == "learn":
+            # 정규화 좌표 [-1, 1] 기준 초기값 = 기존 상수 (0.14, 0.35, 0.18, 0.75). log 공간 학습
+            init = torch.log(torch.tensor([0.14, 0.35, 0.18, 0.75]))
+            self.log_p9 = nn.Parameter(init.clone())
+            self.log_p15 = nn.Parameter(init.clone())
         self.net = nn.Sequential(
             nn.Conv2d(6, 24, 3, padding=1, bias=False),
             nn.BatchNorm2d(24),
@@ -286,37 +300,102 @@ class OrientedLineBranch(nn.Module):
         )
 
     @staticmethod
-    def _make_oriented_kernels(ks, n_ori=8):
-        coords = torch.linspace(-1.0, 1.0, ks)
+    def _kernel_from_params(ks, sigma_v, v0, sigma_neg, sigma_u, n_ori=8):
+        coords = torch.linspace(-1.0, 1.0, ks, device=sigma_v.device, dtype=sigma_v.dtype)
         yy, xx = torch.meshgrid(coords, coords, indexing="ij")
         kernels = []
         for k in range(n_ori):
-            th = k * torch.pi / n_ori
-            u = xx * torch.cos(torch.tensor(th)) + yy * torch.sin(torch.tensor(th))
-            v = -xx * torch.sin(torch.tensor(th)) + yy * torch.cos(torch.tensor(th))
-            line = (torch.exp(-(v ** 2) / (2 * 0.14 ** 2))
-                    - 0.5 * torch.exp(-((v - 0.35) ** 2) / (2 * 0.18 ** 2))
-                    - 0.5 * torch.exp(-((v + 0.35) ** 2) / (2 * 0.18 ** 2)))
-            env = torch.exp(-(u ** 2) / (2 * 0.75 ** 2))
+            th = k * math.pi / n_ori
+            c, s_ = math.cos(th), math.sin(th)
+            u = xx * c + yy * s_
+            v = -xx * s_ + yy * c
+            line = (torch.exp(-(v ** 2) / (2 * sigma_v ** 2))
+                    - 0.5 * torch.exp(-((v - v0) ** 2) / (2 * sigma_neg ** 2))
+                    - 0.5 * torch.exp(-((v + v0) ** 2) / (2 * sigma_neg ** 2)))
+            env = torch.exp(-(u ** 2) / (2 * sigma_u ** 2))
             kern = line * env
             kern = kern - kern.mean()
             kern = kern / (kern.abs().sum() + 1e-8)
             kernels.append(kern)
         return torch.stack(kernels).unsqueeze(1)  # (n_ori, 1, ks, ks)
 
+    @staticmethod
+    def _make_oriented_kernels(ks, n_ori=8):
+        p = torch.tensor([0.14, 0.35, 0.18, 0.75])
+        return OrientedLineBranch._kernel_from_params(ks, p[0], p[1], p[2], p[3], n_ori)
+
+    @staticmethod
+    def _resp(anom, wafer, kern, dilation=1):
+        pad = (kern.shape[-1] // 2) * dilation
+        r = F.conv2d(anom, kern, padding=pad, dilation=dilation)
+        mx = r.max(dim=1, keepdim=True).values
+        an = mx - r.mean(dim=1, keepdim=True)
+        return mx * wafer, an * wafer
+
+    @staticmethod
+    def _anom(defect, wafer):
+        mean_d = defect.sum(dim=(2, 3), keepdim=True) / wafer.sum(dim=(2, 3), keepdim=True).clamp_min(1.0)
+        return (defect - mean_d) * wafer
+
+    @staticmethod
+    def estimate_die_scale(x):
+        """입력 맵만으로 웨이퍼별 1-die 픽셀 크기 s 추정 (1~3). 최근접 업샘플링이면 die 경계 열/행에서만 값이 바뀜."""
+        B, _, H, W = x.shape
+        tx = ((x[..., 1:] - x[..., :-1]).abs() > 1e-6).any(dim=2).any(dim=1).float().sum(dim=-1)   # (B,) 변화 있는 열 수
+        ty = ((x[:, :, 1:, :] - x[:, :, :-1, :]).abs() > 1e-6).any(dim=3).any(dim=1).float().sum(dim=-1)
+        sx = W / (tx + 1.0)
+        sy = H / (ty + 1.0)
+        return (0.5 * (sx + sy)).clamp(1.0, 3.0).view(B, 1, 1, 1)
+
     def forward(self, x):
         # x: (B, 1, H, W) in {0.0, 0.5, 1.0}
         defect = (x > 0.75).to(x.dtype)
         wafer = (x > 0.25).to(x.dtype)
-        mean_d = defect.sum(dim=(2, 3), keepdim=True) / wafer.sum(dim=(2, 3), keepdim=True).clamp_min(1.0)
-        anom = (defect - mean_d) * wafer
-        r9 = F.conv2d(anom, self.k9.to(x.dtype), padding=4)
-        r15 = F.conv2d(anom, self.k15.to(x.dtype), padding=7)
-        max9 = r9.max(dim=1, keepdim=True).values * wafer
-        aniso9 = (r9.max(dim=1, keepdim=True).values - r9.mean(dim=1, keepdim=True)) * wafer
-        max15 = r15.max(dim=1, keepdim=True).values * wafer
-        aniso15 = (r15.max(dim=1, keepdim=True).values - r15.mean(dim=1, keepdim=True)) * wafer
-        feats = torch.cat((defect, anom, max9, aniso9, max15, aniso15), dim=1)
+        anom = self._anom(defect, wafer)
+        H, W = x.shape[-2:]
+        k9 = self.k9.to(x.dtype)
+        if self.mode == "base":
+            max9, aniso9 = self._resp(anom, wafer, k9)
+            max15, aniso15 = self._resp(anom, wafer, self.k15.to(x.dtype))
+            feats = torch.cat((defect, anom, max9, aniso9, max15, aniso15), dim=1)
+        elif self.mode == "learn":
+            p9, p15 = torch.exp(self.log_p9), torch.exp(self.log_p15)
+            kk9 = self._kernel_from_params(9, p9[0], p9[1], p9[2], p9[3]).to(x.dtype)
+            kk15 = self._kernel_from_params(15, p15[0], p15[1], p15[2], p15[3]).to(x.dtype)
+            max9, aniso9 = self._resp(anom, wafer, kk9)
+            max15, aniso15 = self._resp(anom, wafer, kk15)
+            feats = torch.cat((defect, anom, max9, aniso9, max15, aniso15), dim=1)
+        elif self.mode in ("pyr_max", "pyr_avg"):
+            mx_all, ans = [], []
+            for f in (1, 2, 3):
+                if f == 1:
+                    d_s, w_s = defect, wafer
+                elif self.mode == "pyr_max":
+                    d_s, w_s = F.max_pool2d(defect, f, f), F.max_pool2d(wafer, f, f)
+                else:
+                    d_s, w_s = F.avg_pool2d(defect, f, f), (F.avg_pool2d(wafer, f, f) > 0.5).to(x.dtype)
+                a_s = self._anom(d_s, w_s)
+                mx, an = self._resp(a_s, w_s, k9)
+                if f > 1:
+                    mx = F.interpolate(mx, size=(H, W), mode="bilinear", align_corners=False) * wafer
+                    an = F.interpolate(an, size=(H, W), mode="bilinear", align_corners=False) * wafer
+                mx_all.append(mx); ans.append(an)
+            max_all = torch.stack(mx_all, 0).max(0).values
+            feats = torch.cat((defect, anom, ans[0], ans[1], ans[2], max_all), dim=1)
+        elif self.mode == "scale":
+            s = self.estimate_die_scale(x).to(x.dtype)
+            mxs, ans = [], []
+            for d in (1, 2, 3):
+                mx, an = self._resp(anom, wafer, k9, dilation=d)
+                mxs.append(mx); ans.append(an)
+            w1 = (2.0 - s).clamp(0.0, 1.0)
+            w2 = (1.0 - (s - 2.0).abs()).clamp(0.0, 1.0)
+            w3 = (s - 2.0).clamp(0.0, 1.0)
+            max_a = w1 * mxs[0] + w2 * mxs[1] + w3 * mxs[2]
+            aniso_a = w1 * ans[0] + w2 * ans[1] + w3 * ans[2]
+            feats = torch.cat((defect, anom, max_a, aniso_a, ans[0], ans[2]), dim=1)
+        else:
+            raise ValueError(self.mode)
         return self.net(feats)
 
 
@@ -505,15 +584,18 @@ def build_model(arch, num_classes, in_ch=1):
                 in_dim=dim3, num_classes=num_classes, h=6, w=6, num_heads=4, num_steps=3, dropout=0.1
             ))
             m.avgpool = SpatialEvidencePooling(in_dim=m.fc.in_features, hidden_dim=128, dropout=0.1)
-        elif USE_SA in ("ver9.9", "ver9.9A", "ver9.9B", "ver9.9C"):
+        elif USE_SA in ("ver9.9", "ver9.9A", "ver9.9B", "ver9.9C", "ver9.9_pyr_max", "ver9.9_pyr_avg", "ver9.9_learn", "ver9.9_scale",
+                    "ver9.9A_pyr_max", "ver9.9A_pyr_avg", "ver9.9A_learn", "ver9.9A_scale"):
+            V97 = {"ver9.9_pyr_max": "pyr_max", "ver9.9_pyr_avg": "pyr_avg", "ver9.9_learn": "learn", "ver9.9_scale": "scale",
+                   "ver9.9A_pyr_max": "pyr_max", "ver9.9A_pyr_avg": "pyr_avg", "ver9.9A_learn": "learn", "ver9.9A_scale": "scale"}
             dim3 = _layer_out_channels(m.layer3)
-            m.line_branch = OrientedLineBranch(out_dim=dim3, dropout=0.1)
+            m.line_branch = OrientedLineBranch(out_dim=dim3, dropout=0.1, mode=V97.get(USE_SA, "base"))
             m.line_scale = nn.Parameter(torch.tensor(0.05))
-            if USE_SA in ("ver9.9", "ver9.9B"):
+            if USE_SA in ("ver9.9", "ver9.9B", "ver9.9_pyr_max", "ver9.9_pyr_avg", "ver9.9_learn", "ver9.9_scale"):
                 m.layer3_sa = IterativeSpatialBeliefAttention(
                     in_dim=dim3, num_classes=num_classes, h=6, w=6, num_heads=4, num_steps=3, dropout=0.1
                 )
-            if USE_SA in ("ver9.9", "ver9.9C"):
+            if USE_SA in ("ver9.9", "ver9.9C", "ver9.9_pyr_max", "ver9.9_pyr_avg", "ver9.9_learn", "ver9.9_scale"):
                 m.avgpool = SpatialEvidencePooling(in_dim=m.fc.in_features, hidden_dim=128, dropout=0.1)
 
             def _forward_features_v99(x):
