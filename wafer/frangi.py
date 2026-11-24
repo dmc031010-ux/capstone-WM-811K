@@ -73,8 +73,11 @@ def calibrate(h=60, w=60):
 C_FIXED = calibrate()
 
 
-def cache_paths(cache):
-    d = os.path.join(cache, "y9.2"); return os.path.join(d, "frangi_u8.npy"), os.path.join(d, "frangi_idx.npy")
+def cache_paths(cache, kind="frangi"):
+    """kind: "frangi" (y9.2, V) / "length" (y9.3a, V·w) / "scaled" (y9.3b, k·V)."""
+    if kind == "frangi":
+        d = os.path.join(cache, "y9.2"); return os.path.join(d, "frangi_u8.npy"), os.path.join(d, "frangi_idx.npy")
+    d = os.path.join(cache, "y9.3"); return os.path.join(d, f"{kind}_u8.npy"), os.path.join(d, f"{kind}_idx.npy")
 
 
 def build_labeled_cache(cache, pkl, size=96, extra=()):
@@ -118,3 +121,92 @@ def build_labeled_cache(cache, pkl, size=96, extra=()):
             print(f"[frangi] {k0 + len(ch)}/{len(idx)} ({time.time() - t:.0f}s)", flush=True)
     np.save(out_u8, U); np.save(out_idx, idx)
     print(f"[frangi] 저장 {out_u8} {U.nbytes / 1e9:.2f}GB ({time.time() - t:.0f}s)")
+
+
+# ---------------- y9.3: 선 길이 (die) 가중치 ----------------
+LMAX = 30.0   # 포화점 (die)
+
+
+def line_weight(nat, mode="defect", V=None, tau=None, reach=2.0, lmax=LMAX, return_parts=False):
+    """원본 die 격자 nat 의 die 별 길이 가중치 w ∈ [0,1] (y9.3, debate/y9.3/03).
+    성분: mode="defect" 불량 die 8-연결, mode="ridge" Frangi 능선 {V ≥ tau} (웨이퍼 안) 8-연결.
+    성분 중 픽셀 ≥ 3 이고 길쭉함 (주/부 표준편차 비) ≥ 3 인 것만 g = min(L, lmax)/lmax, L = 주축 투영 범위 + 1 (die). 나머지 성분 g = 0.
+    각 die 의 w = 거리 ≤ reach (die) 안의 가장 가까운 성분 픽셀이 속한 성분의 g, 아니면 0. 웨이퍼 밖 0."""
+    S = (nat == 2) if mode == "defect" else ((V >= tau) & (nat > 0))
+    lab, n = ndimage.label(S, structure=np.ones((3, 3)))
+    w = np.zeros(nat.shape, np.float32)
+    if n == 0:
+        return (w, lab, np.zeros(1)) if return_parts else w
+    r, c = np.nonzero(lab); k = lab[r, c]; r = r.astype(np.float64); c = c.astype(np.float64)
+    cnt = np.bincount(k, minlength=n + 1).astype(np.float64); cs = np.maximum(cnt, 1)
+    mr, mc = np.bincount(k, r, n + 1) / cs, np.bincount(k, c, n + 1) / cs
+    dr, dc = r - mr[k], c - mc[k]
+    a = np.bincount(k, dr * dr, n + 1) / cs; d = np.bincount(k, dc * dc, n + 1) / cs; b = np.bincount(k, dr * dc, n + 1) / cs
+    t = np.sqrt(((a - d) / 2) ** 2 + b ** 2); lmax_ev, lmin_ev = (a + d) / 2 + t, (a + d) / 2 - t
+    elong = np.sqrt(lmax_ev / np.maximum(lmin_ev, 1e-6))
+    vr, vc = np.where(np.abs(b) > 1e-12, b, np.where(a >= d, 1.0, 0.0)), np.where(np.abs(b) > 1e-12, lmax_ev - a, np.where(a >= d, 0.0, 1.0))
+    nv = np.hypot(vr, vc); vr, vc = vr / np.maximum(nv, 1e-12), vc / np.maximum(nv, 1e-12)
+    proj = dr * vr[k] + dc * vc[k]
+    pmax = np.full(n + 1, -np.inf); pmin = np.full(n + 1, np.inf)
+    np.maximum.at(pmax, k, proj); np.minimum.at(pmin, k, proj)
+    L = np.where(cnt > 0, pmax - pmin + 1, 0.0)
+    g = np.where((cnt >= 3) & (elong >= 3), np.minimum(L, lmax) / lmax, 0.0); g[0] = 0.0
+    dist, (ri, ci) = ndimage.distance_transform_edt(lab == 0, return_indices=True)
+    w = g[lab[ri, ci]].astype(np.float32); w[dist > reach] = 0.0; w[nat == 0] = 0.0
+    return (w, lab, np.where(cnt > 0, L, 0.0) * ((cnt >= 3) & (elong >= 3))) if return_parts else w
+
+
+TAU = 0.2   # y9.3 0단계에서 고른 능선 임계 (runs/y9.3_step0/verify_length.txt)
+
+
+def build_y93_cache(cache, pkl, size=96):
+    """y9.3: y9.2 캐시와 같은 웨이퍼 집합에 대해 length (V·w, 능선 τ=TAU) 와 scaled (k·V) 두 표를 만든다.
+    k = 5% 라벨 학습 세트 (split_seed 0) 의 불량 die 위 mean(V·w) / mean(V) (원본 격자). 원본 격자 얻는 방법은 build_labeled_cache 와 같음."""
+    import pickle, sys as _sys, time
+    from .data import WM811K, _resize_nearest
+    ds = WM811K(cache); sd = np.load(os.path.join(cache, "wm811k_shapes_dies.npy"))
+    idx = np.load(cache_paths(cache)[1])
+    big = idx[sd[idx, :2].max(1) > size]; t = time.time(); nat_big = {}
+    if len(big):
+        import pandas.core.indexes
+        _sys.modules.setdefault("pandas.indexes", pandas.core.indexes)
+        with open(pkl, "rb") as f:
+            maps = pickle.load(f, encoding="latin1")["waferMap"].values
+        for i in big:
+            nat_big[int(i)] = np.minimum(np.asarray(maps[i]).astype(np.uint8), 2)
+            assert nat_big[int(i)].shape == tuple(sd[i, :2])
+        del maps
+
+    def natives(ch):
+        img = ds.fetch(ch, "cpu")[:, 0].numpy().astype(np.uint8)
+        for j, i in enumerate(ch):
+            h, w = sd[i, :2]
+            if int(i) in nat_big:
+                yield nat_big[int(i)]; continue
+            ri = ((np.arange(size) + 0.5) * h / size).astype(np.int64); ci = ((np.arange(size) + 0.5) * w / size).astype(np.int64)
+            nat = img[j][np.ix_(np.unique(ri, return_index=True)[1], np.unique(ci, return_index=True)[1])]
+            assert nat.shape == (h, w); yield nat
+
+    lab = ds.labeled_subset(0.05, seed=0); s_vw = s_v = 0.0
+    for k0 in range(0, len(lab), 4096):
+        for nat in natives(lab[k0:k0 + 4096]):
+            v = vesselness(nat); w = line_weight(nat, "ridge", V=v, tau=TAU); b = nat == 2
+            s_vw += float((v * w)[b].sum()); s_v += float(v[b].sum())
+    k = s_vw / s_v
+    print(f"[y9.3] k = mean(V·w)/mean(V) (5% 학습, 불량 die 위) = {k:.4f}", flush=True)
+    UL = np.zeros((len(idx), size, size), np.uint8); US = np.zeros((len(idx), size, size), np.uint8)
+    for k0 in range(0, len(idx), 4096):
+        ch = idx[k0:k0 + 4096]
+        for j, nat in enumerate(natives(ch)):
+            v = vesselness(nat); w = line_weight(nat, "ridge", V=v, tau=TAU)
+            assert np.isfinite(v).all()
+            UL[k0 + j] = np.rint(_resize_nearest((v * w)[None], size)[0] * 255).astype(np.uint8)
+            US[k0 + j] = np.rint(_resize_nearest((k * v)[None], size)[0] * 255).astype(np.uint8)
+        if k0 % 40960 == 0:
+            print(f"[y9.3] {k0 + len(ch)}/{len(idx)} ({time.time() - t:.0f}s)", flush=True)
+    for kind, U in (("length", UL), ("scaled", US)):
+        pu, pi = cache_paths(cache, kind); os.makedirs(os.path.dirname(pu), exist_ok=True)
+        np.save(pu, U); np.save(pi, idx)
+    with open(os.path.join(os.path.dirname(cache_paths(cache, "length")[0]), "k.txt"), "w") as f:
+        f.write(f"{k:.6f}\n")
+    print(f"[y9.3] 저장 ({time.time() - t:.0f}s)")

@@ -185,12 +185,12 @@ def finetune(ds, lab_idx, sub, enc_path, args, out_dir, device):
     model = model.to(device)
     missing = model.load_state_dict(torch.load(enc_path, map_location=device, weights_only=True), strict=False)
     assert set(missing.missing_keys) == {"fc.weight", "fc.bias"}, missing
-    if getattr(args, "frangi", None):   # y9.2a / y9.2b: ver8 인코더 + 입력 2채널 (Frangi / 0), 새 채널 가중치 0 에서 시작
+    if getattr(args, "frangi", None):   # y9.2a / y9.2b / y9.3a / y9.3b: ver8 인코더 + 입력 2채널 (Frangi / 0), 새 채널 가중치 0 에서 시작
         assert args.v3_nopl and not (args.size_head or args.film or args.class_pool or args.triplet)
         table, row = None, None
-        if args.frangi == "frangi":
+        if args.frangi in ("frangi", "length", "scaled"):   # y9.3a 길이 가중 / y9.3b 진폭 맞춘 k·V (별도 캐시)
             from .frangi import cache_paths
-            pu, pi = cache_paths(args.cache)
+            pu, pi = cache_paths(args.cache, args.frangi)
             table = torch.from_numpy(np.load(pu)); gi = np.load(pi)
             row = np.full(len(ds.labels), -1, np.int64); row[gi] = np.arange(len(gi))
         model = FrangiInput(model, table, row).to(device)
