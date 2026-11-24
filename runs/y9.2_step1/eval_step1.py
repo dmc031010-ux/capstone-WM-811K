@@ -6,7 +6,8 @@
 [C] 굵기 조작 (Codex C4·C6, val none 배경): 같은 배경·같은 중심선에 1/2/3 die 선 → 평균 Scratch 확률.
     Frangi 채널은 조작된 원본 격자에서 다시 계산. 배경 die ≥1200 100장, 300~1199 100장.
 진행 기준 (debate/y9.2/03): seed 0·1 둘 다 (a)−(b) val macro > 0, 소수 5개 중 −0.03 넘는 하락 없음, die<1200 Scratch 재현율 상승
-사용: python runs/y9.2_step1/eval_step1.py
+사용: python runs/y9.2_step1/eval_step1.py [seed ...]  (기본 0 1)
+규칙 ② (debate/y9.2/07_final.md, 2026-11-24): 참여 seed 평균 a − b 로 판정
 """
 import os, sys, json
 import numpy as np, torch
@@ -17,6 +18,7 @@ from wafer import frangi as Fr
 from wafer.data import WM811K, CLASSES, NUM_CLASSES, _resize_nearest
 from wafer.models import build_model, to_input, FrangiInput
 
+SEEDS = tuple(int(a) for a in sys.argv[1:]) or (0, 1)
 dev = torch.device("cuda"); CACHE = os.path.expanduser("~/wafer_cache")
 ds = WM811K(CACHE); sd = np.load(os.path.join(CACHE, "wm811k_shapes_dies.npy")); dies = sd[:, 2]
 SC, NO, LO = CLASSES.index("Scratch"), CLASSES.index("none"), CLASSES.index("Loc")
@@ -82,7 +84,7 @@ for gname, lo, hi in [("die ≥1200", 1200, 10 ** 9), ("die 300~1199", 300, 1200
 
 small_sc = dies[va[yv == SC]] < 1200
 R = {}
-for seed in (0, 1):
+for seed in SEEDS:
     P = {}
     for kind in ("ver8", "b", "a"):
         m, d = load(seed, kind); p = probs_idx(m, va); P[kind] = p; pred = p.argmax(1)
@@ -103,7 +105,7 @@ for seed in (0, 1):
         R[(seed, kind)]["new_hit"] = int((~a0 & a1).sum()); R[(seed, kind)]["new_miss"] = int((a0 & ~a1).sum())
 
 NAME = {"ver8": "ver8 (기존)", "b": "y9.2b 0 채널", "a": "y9.2a Frangi"}
-for seed in (0, 1):
+for seed in SEEDS:
     print(f"\n========== seed {seed} (val) ==========")
     print(f"{'':16s} {'macro':>6s} {'Scr F1':>6s} {'재현':>5s} {'정밀':>5s} {'AP':>5s} | 재현 die<1200 / ≥1200 | none→S Loc→S S→none S→Loc | " + " ".join(f"{c[:5]:>5s}" for c in MINOR) + " | best ep")
     for kind in ("ver8", "b", "a"):
@@ -120,3 +122,16 @@ for seed in (0, 1):
     print(f"  진행 기준 (a − b): macro {ra['macro'] - rb['macro']:+.3f} {'O' if ra['macro'] > rb['macro'] else 'X'} | "
           f"소수 최대 하락 {min(drop.values()):+.3f} ({min(drop, key=drop.get)}) {'O' if min(drop.values()) >= -0.03 else 'X'} | "
           f"die<1200 재현 {ra['rec_small'] - rb['rec_small']:+.3f} {'O' if ra['rec_small'] > rb['rec_small'] else 'X'}")
+
+# ---------- 규칙 ② (평균) ----------
+A_ = [R[(k, "a")] for k in SEEDS]; B_ = [R[(k, "b")] for k in SEEDS]
+dm = [a["macro"] - b["macro"] for a, b in zip(A_, B_)]
+need = len(SEEDS) if len(SEEDS) < 5 else 4
+dmin = {c: float(np.mean([a["f1"][c] - b["f1"][c] for a, b in zip(A_, B_)])) for c in MINOR}
+dr = float(np.mean([a["rec_small"] - b["rec_small"] for a, b in zip(A_, B_)]))
+c1 = np.mean(dm) > 0 and sum(d > 0 for d in dm) >= need; c2 = min(dmin.values()) >= -0.03; c3 = dr > 0
+print(f"\n========== 규칙 ② (seed {SEEDS} 평균, a − b) ==========")
+print(f"  1) macro 평균 {np.mean(dm):+.3f}, seed별 " + " ".join(f"{d:+.3f}" for d in dm) + f" (> 0 이 {need}개 이상) {'O' if c1 else 'X'}")
+print("  2) 소수 평균 차 " + " ".join(f"{c} {v:+.3f}" for c, v in dmin.items()) + f" (모두 ≥ −0.03) {'O' if c2 else 'X'}")
+print(f"  3) die<1200 Scratch 재현 평균 {dr:+.3f} {'O' if c3 else 'X'}")
+print(f"  판정: {'통과' if c1 and c2 and c3 else '미달'}")

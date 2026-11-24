@@ -1,0 +1,26 @@
+val none 14743장. 값은 중앙값 (96 격자 기준: nbad 불량 픽셀 수, length 가장 큰 불량 덩어리 길이 px, elong 길쭉함)
+  맞게 판정된 none 전체 (seed 2 a 기준): nbad 692 bad_ratio 0.0979 dies 776 fmax 0.545 fbad 0.201 length 16.3 elong 2.25
+  불량 있는 none (nbad ≥ 5)            : nbad 696 bad_ratio 0.0985 dies 776 fmax 0.549 fbad 0.202 length 16.4 elong 2.26
+
+[seed 0] none→Scratch: ver8 43, b 64, a 56 | a 오탐 중 b 도 오탐 13, ver8 도 오탐 16, a 에만 37
+  a 오탐 전체      : nbad 674 bad_ratio 0.0945 dies 1.11e+03 fmax 0.702 fbad 0.233 length 25.7 elong 3.2
+  a 에만 새 오탐   : nbad 676 bad_ratio 0.0942 dies 1.11e+03 fmax 0.702 fbad 0.234 length 25.6 elong 3.31
+  b 오탐 (비교)    : nbad 218 bad_ratio 0.0302 dies 4.8e+03 fmax 0.659 fbad 0.168 length 12.1 elong 3.39
+  a 오탐 Scratch 확률 중앙값 0.93, ≥0.9 인 비율 0.59
+
+[seed 1] none→Scratch: ver8 76, b 31, a 33 | a 오탐 중 b 도 오탐 8, ver8 도 오탐 16, a 에만 17
+  a 오탐 전체      : nbad 686 bad_ratio 0.0953 dies 1.23e+03 fmax 0.71 fbad 0.234 length 22.7 elong 3.22
+  a 에만 새 오탐   : nbad 681 bad_ratio 0.0947 dies 1.23e+03 fmax 0.71 fbad 0.234 length 22.5 elong 2.96
+  b 오탐 (비교)    : nbad 589 bad_ratio 0.0836 dies 1.11e+03 fmax 0.675 fbad 0.225 length 18.5 elong 2.44
+  a 오탐 Scratch 확률 중앙값 0.83, ≥0.9 인 비율 0.39
+
+[seed 2] none→Scratch: ver8 24, b 52, a 67 | a 오탐 중 b 도 오탐 22, ver8 도 오탐 13, a 에만 44
+  a 오탐 전체      : nbad 701 bad_ratio 0.0993 dies 895 fmax 0.675 fbad 0.236 length 25.6 elong 3.11
+  a 에만 새 오탐   : nbad 829 bad_ratio 0.12 dies 776 fmax 0.667 fbad 0.242 length 25.9 elong 2.95
+  b 오탐 (비교)    : nbad 630 bad_ratio 0.0874 dies 1.16e+03 fmax 0.676 fbad 0.215 length 19 elong 2.74
+  a 오탐 Scratch 확률 중앙값 0.87, ≥0.9 인 비율 0.45
+
+세 seed a 모두 오탐: 19장, 그중 b·ver8 어느 하나라도 오탐 17장
+  nbad 671 bad_ratio 0.0947 dies 1.13e+03 fmax 0.702 fbad 0.247 length 26 elong 3.44
+
+그림: C:\Users\annan\OneDrive\바탕 화면\umm\runs\y9.2_step1
