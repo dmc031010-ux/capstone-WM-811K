@@ -6,24 +6,24 @@
 
 ## 1. 전체 요약표 (`seed=0` 기준)
 
-| `--method` | 분류 / 출처 | SSL 인코더 캐시 | `USE_SA` / 핵심 설정 | Val Macro F1 | **Test Macro F1** | **Scratch F1 (`TP/120`, `n→S`)** | 결과 로그 (`metrics.json`) |
+| `--method` | 분류 / 출처 | SSL 인코더 캐시 | `USE_SA` / 핵심 설정 | Val Macro F1 *(Scratch)* | **Test Macro F1** | **Scratch F1 (`TP/120`, `n→S`)** | 결과 로그 (`metrics.json`) |
 | --- | --- | --- | --- | ---: | ---: | --- | --- |
-| `ver3` | SimCLR 기준선 | `simclr_random_cut_e50.pt` | `False` | - | `0.8391` | `0.6161` (`69/120`, `19`) | - |
-| `ver7` | MaskLat 기준선 (`ver8` 동일) | `masklat7_e50.pt` | `False` | - | `0.8314` | `0.4766` (`56/120`, `44`) | - |
-| `ver9.1` | Frangi 2채널 입력 (`yeeun`) | `masklat8_e50.pt` | `FrangiInput`, `no_test=True` | `0.832` | *(미평가)* | *(val 0.561)* | `runs/.../seed0/ver9.1_ssl50_ft30/metrics.json` |
-| `ver9.2A` | Spatial SA (`layer4` 3×3) | `masklat7_e50.pt` | `True`, `use_gate=False` | - | `0.8253` | `0.4715` | - |
-| **`ver9.2B`** | Spatial SA (`layer3` 6×6) | `masklat7_e50.pt` | `"layer3"`, `use_gate=True` | - | `0.8286` | `0.4956` | - |
-| `ver9.2C` | Spatial SA (`layer2` 12×12) | `masklat7_e50.pt` | `"layer2"`, `use_gate=True` | - | `0.8178` | `0.4740` | - |
-| `ver9.3A` | SSL 4뷰 Inter-View SA | `masklat93a_e50.pt` | `view_attention=True` | - | `0.8296` | `0.4150` | - |
-| `ver9.3B` | SSL 4뷰 Target Sim Gate | `masklat93b_e50.pt` | `view_gate_mode="target_similarity"` | - | `0.8148` | - | - |
-| `ver9.3C` | SSL 4뷰 Cond Gate | `masklat93c_e50.pt` | `view_gate_mode="target_conditioned"` | - | `0.8165` | - | - |
-| **`ver9.4`** | **`Line` 기본형** | `masklat7_e50.pt` | `"line_base"` | - | `0.8230` | `0.5024` (`52/120`, `30`) | `runs/.../seed0/ver9.4_ssl50_ft30/metrics.json` |
-| **`ver9.5`** | **`Belief` 기본형** | `masklat7_e50.pt` | `"belief_base"`, `aux_belief_w=0.3` | - | `0.8288` | `0.4074` (`44/120`, `49`) | `runs/.../seed0/ver9.5_ssl50_ft30/metrics.json` |
-| **`ver9.6`** | **`Pool` 기본형** | `masklat7_e50.pt` | `"pool_base"` | `0.8147` | `0.8275` | `0.4396` (`60/120`, `82`) | `runs/.../seed0/ver9.6_ssl50_ft30/metrics.json` |
-| **`ver9.7A`** | **`ver7` + 3모듈 통합** | `masklat7_e50.pt` | `"three_base"`, `aux_belief_w=0.3` | `0.8272` | `0.8297` | `0.5900` (`59/120`, `17`) | `runs/.../seed0/ver9.7A_ssl50_ft30/metrics.json` |
-| **`ver9.7B`** ⭐ | **`SimCLR` + 3모듈 통합** | `simclr_random_cut_e50.pt` | `"three_base"`, `aux_belief_w=0.3` | `0.8251` | **`0.8640`** | `0.6204` (`67/120`, `24`) | `runs/.../seed0/ver9.7B_ssl50_ft30/metrics.json` |
-| **`ver9.8A`** ⭐ | **`ver9.7A` + 안정화 레시피** | `masklat7_e50.pt` | `"three_base"` + 5종 레시피 (`feat/hanbandoche ver9.4`) | - | **`0.8527 ± 0.0001`** *(2-seed)* | **`0.6777 ± 0.0000`** | - |
-| **`ver9.8B`** ⭐ | **`ver9.7B` + 안정화 레시피** | `simclr_random_cut_e50.pt` | `"three_base"` + 5종 레시피 (`feat/hanbandoche ver9.4_simclr`) | - | **`0.8674`** | `0.6585` | - |
+| `ver3` | SimCLR 기준선 | `simclr_random_cut_e50.pt` | `False` | `0.8202` *(0.5526)* | `0.8391` | `0.6161` (`69/120`, `19`) | `runs/.../seed0/ver3_ssl50_ft30/metrics.json` |
+| `ver7` | MaskLat 기준선 (`ver8` 동일) | `masklat7_e50.pt` | `False` | `0.8184` *(0.4464)* | `0.8314` | `0.4766` (`56/120`, `44`) | `runs/.../seed0/ver7_ssl50_ft30/metrics.json` |
+| `ver9.1` | Frangi 2채널 입력 (`yeeun`) | `masklat8_e50.pt` | `FrangiInput`, `no_test=True` | `0.8315` *(0.5606)* | *(미평가)* | *(val 0.5606)* | `runs/.../seed0/ver9.1_ssl50_ft30/metrics.json` |
+| `ver9.2A` | Spatial SA (`layer4` 3×3) | `masklat7_e50.pt` | `True`, `use_gate=False` | `0.8032` *(0.3916)* | `0.8253` | `0.4715` | - |
+| **`ver9.2B`** | Spatial SA (`layer3` 6×6) | `masklat7_e50.pt` | `"layer3"`, `use_gate=True` | `0.8071` *(0.3460)* | `0.8286` *(s0: `0.7960`)* | `0.4956` *(s0: `0.3171`)* | `runs/.../seed0/ver9.2B_ssl50_ft30/metrics.json` |
+| `ver9.2C` | Spatial SA (`layer2` 12×12) | `masklat7_e50.pt` | `"layer2"`, `use_gate=True` | `0.8041` *(0.4355)* | `0.8178` *(s0: `0.8024`)* | `0.4740` *(s0: `0.3937`)* | `runs/.../seed0/ver9.2C_ssl50_ft30/metrics.json` |
+| `ver9.3A` | SSL 4뷰 Inter-View SA | `masklat93a_e50.pt` | `view_attention=True` | `0.7881` *(0.3618)* | `0.8296` | `0.4150` | - |
+| `ver9.3B` | SSL 4뷰 Target Sim Gate | `masklat93b_e50.pt` | `view_gate_mode="target_similarity"` | `0.8012` *(0.3287)* | `0.8148` *(s0: `0.8139`)* | `0.3346` *(신규 s0)* | `runs/.../seed0/ver9.3B_ssl50_ft30/metrics.json` |
+| `ver9.3C` | SSL 4뷰 Cond Gate | `masklat93c_e50.pt` | `view_gate_mode="target_conditioned"` | `0.8054` *(0.4402)* | `0.8165` *(s0: `0.8300`)* | `0.4928` *(신규 s0)* | `runs/.../seed0/ver9.3C_ssl50_ft30/metrics.json` |
+| **`ver9.4`** | **`Line` 기본형** | `masklat7_e50.pt` | `"line_base"` | `0.8099` *(0.4402)* | `0.8230` | `0.5024` (`52/120`, `30`) | `runs/.../seed0/ver9.4_ssl50_ft30/metrics.json` |
+| **`ver9.5`** | **`Belief` 기본형** | `masklat7_e50.pt` | `"belief_base"`, `aux_belief_w=0.3` | `0.8136` *(0.3644)* | `0.8288` | `0.4074` (`44/120`, `49`) | `runs/.../seed0/ver9.5_ssl50_ft30/metrics.json` |
+| **`ver9.6`** | **`Pool` 기본형** | `masklat7_e50.pt` | `"pool_base"` | `0.8147` *(0.3885)* | `0.8275` | `0.4396` (`60/120`, `82`) | `runs/.../seed0/ver9.6_ssl50_ft30/metrics.json` |
+| **`ver9.7A`** | **`ver7` + 3모듈 통합** | `masklat7_e50.pt` | `"three_base"`, `aux_belief_w=0.3` | `0.8272` *(0.5729)* | `0.8297` | `0.5900` (`59/120`, `17`) | `runs/.../seed0/ver9.7A_ssl50_ft30/metrics.json` |
+| **`ver9.7B`** ⭐ | **`SimCLR` + 3모듈 통합** | `simclr_random_cut_e50.pt` | `"three_base"`, `aux_belief_w=0.3` | `0.8251` *(0.5221)* | **`0.8640`** | `0.6204` (`67/120`, `24`) | `runs/.../seed0/ver9.7B_ssl50_ft30/metrics.json` |
+| **`ver9.8A`** ⭐ | **`ver9.7A` + 안정화 레시피** | `masklat7_e50.pt` | `"three_base"` + 5종 레시피 (`feat/hanbandoche ver9.4`) | `0.8433` *(0.6024)* | **`0.8527 ± 0.0001`** *(s0 cos: `0.8504`)* | **`0.6777 ± 0.0000`** *(s0 cos: `0.6513`)* | `runs/.../seed0/ver9.8A_ssl50_ft30_cos/metrics.json` |
+| **`ver9.8B`** ⭐ | **`ver9.7B` + 안정화 레시피** | `simclr_random_cut_e50.pt` | `"three_base"` + 5종 레시피 (`feat/hanbandoche ver9.4_simclr`) | **`0.8531`** *(**0.6349**)* | **`0.8674`** *(s0 cos: `0.8611`)* | `0.6585` *(s0 cos: `0.6639`)* | `runs/.../seed0/ver9.8B_ssl50_ft30_cos/metrics.json` |
 
 ---
 
@@ -99,8 +99,8 @@ WM-811K에서 `Scratch`가 가장 자주 `none`으로 오분류되는 원인을 
   4. `warmup_epochs = 5 + cosine` (`0.1→1.0→0.05`): 초반 사전학습 백본 보호 후 부드러운 코사인 수렴
   5. `use_hflip = True`: 약증강에 회전 외에 좌우 반전(`A.hflip`) 추가 (`+ aux_belief_w=0.3`, `grad_clip=1.0`)
 - **검증 결과**:
-  - **`ver9.8A`** (`ver7` 인코더): 2-seed Test **`0.8527 ± 0.0001`**, Scratch **`0.6777 ± 0.0000`** (seed 편차 사실상 0 달성)
-  - **`ver9.8B`** (`SimCLR` 인코더): `seed=0` Test **`0.8674`**, Scratch **`0.6585`** (`Scratch`는 바둑판 마스킹 `ver9.8A`가 `+1.92%p` 우위)
+  - **`ver9.8A`** (`ver7` 인코더): 2-seed Test **`0.8527 ± 0.0001`**, Scratch **`0.6777 ± 0.0000`** (seed 편차 사실상 0 달성) · 신규 `seed=0` 실측 Val **`0.8433`**, Val Scratch **`0.6024`** (`TP=75/119, n→S=43`), Test **`0.8504`**, Test Scratch **`0.6513`** (`TP=85/120, n→S=45`)
+  - **`ver9.8B`** (`SimCLR` 인코더): `seed=0` Test **`0.8674`**, Scratch **`0.6585`** (`Scratch`는 바둑판 마스킹 `ver9.8A`가 `+1.92%p` 우위) · 신규 `seed=0` 실측 Val **`0.8531`**, Val Scratch **`0.6349`** (`TP=80/119, n→S=31`), Test **`0.8611`**, Test Scratch **`0.6639`** (`TP=79/120, n→S=27`)
 
 ---
 
