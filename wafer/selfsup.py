@@ -1,4 +1,4 @@
-﻿"""ver3: 자기지도(SimCLR) → 군집화 → labeled 로 군집 이름 붙이기 → 미세조정 + 재군집 반복.
+"""ver3: 자기지도(SimCLR) → 군집화 → labeled 로 군집 이름 붙이기 → 미세조정 + 재군집 반복.
 
 발전 옵션: --v3_weight purity (군집 순도 가중치 + 순도 20% 미만 군집 제외), --v3_nopl (군집 pseudo-label 끔, ablation),
           --v3_multicrop (자기지도에 국소 crop view 추가), --v3_clusters K (군집 수)
@@ -175,6 +175,15 @@ def focal_loss(logits, y, gamma=2.0):
     return ((1 - torch.exp(-ce)) ** gamma * ce).mean()
 
 
+class _ForwardFeatures(nn.Module):
+    def __init__(self, m):
+        super().__init__()
+        self.m = m
+
+    def forward(self, x):
+        return self.m.forward_features(x)
+
+
 def finetune(ds, lab_idx, sub, enc_path, args, out_dir, device):
     os.makedirs(out_dir, exist_ok=True)
     set_seed(args.seed)
@@ -192,6 +201,9 @@ def finetune(ds, lab_idx, sub, enc_path, args, out_dir, device):
         sa_prefixes = {
             "layer3": ("layer3.sa.",),
             "layer2": ("layer2.sa.",),
+            "line_base": ("line_branch.", "line_scale"),
+            "belief_base": ("layer3.sa.",),
+            "pool_base": ("avgpool.",),
         }.get(sa_mode, ("avgpool.0.",))
         assert expected_missing <= actual_missing, missing
         assert actual_missing - expected_missing == {k for k in actual_missing if k.startswith(sa_prefixes)}, missing
@@ -236,6 +248,7 @@ def finetune(ds, lab_idx, sub, enc_path, args, out_dir, device):
     tracker = _Tracker(out_dir, model, ds, device, args, dict(n_labeled=len(lab_idx), n_sub=len(sub), stage="ver3", v3=V3, rounds=[]))
     feat_model = (model.base if args.size_head else FiLMFeatures(model) if args.film
                   else FrangiFeatures(model) if getattr(args, "frangi", None)
+                  else _ForwardFeatures(model) if hasattr(model, "forward_features")
                   else nn.Sequential(*list(model.base.children())[:-1], nn.Flatten()) if args.class_pool
                   else nn.Sequential(*list(model.children())[:-1], nn.Flatten()))   # fc 앞 특징 (가중치 공유)
     ep = 0
@@ -266,7 +279,9 @@ def finetune(ds, lab_idx, sub, enc_path, args, out_dir, device):
         for _ in range(args.ft_epochs):
             ep += 1
             model.train()
-            t, acc = time.time(), dict(Ls=0.0, Lc=0.0, **({"Lt": 0.0} if args.triplet else {}))
+            aux_w = getattr(args, "aux_belief_w", 0.0)
+            grad_clip = getattr(args, "grad_clip", 0.0)
+            t, acc = time.time(), dict(Ls=0.0, Lc=0.0, **({"Lt": 0.0} if args.triplet else {}), **({"La": 0.0} if aux_w > 0.0 else {}))
             for _ in range(steps):
                 li = lab_idx[lsampler(B)]
                 yl = torch.from_numpy(ds.labels[li]).to(device)
@@ -303,8 +318,22 @@ def finetune(ds, lab_idx, sub, enc_path, args, out_dir, device):
                 loss = Ls + V3["lambda_c"] * Lc
                 if args.triplet:
                     loss = loss + args.triplet * Lt
+                if aux_w > 0.0:
+                    sa_mod = getattr(model.layer3, "sa", None)
+                    step_logits = getattr(sa_mod, "last_step_logits", None)
+                    if step_logits:
+                        n_st = len(step_logits)
+                        w_sum = n_st * (n_st + 1) / 2.0
+                        La = sum(((i + 1) / w_sum) * F.cross_entropy(sl[:B], yl, weight=cw if (cw != 1.0).any() else None)
+                                 for i, sl in enumerate(step_logits))
+                        loss = loss + aux_w * La
+                        acc["La"] += La.item()
+                        sa_mod.last_step_logits = None
                 opt.zero_grad(set_to_none=True)
                 scaler.scale(loss).backward()
+                if grad_clip > 0.0:
+                    scaler.unscale_(opt)
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
                 scaler.step(opt); scaler.update(); sched.step()
                 acc["Ls"] += Ls.item(); acc["Lc"] += Lc.item()
             log = {k: v / steps for k, v in acc.items()}

@@ -1,3 +1,4 @@
+import math
 import os
 
 import numpy as np
@@ -74,6 +75,206 @@ class SpatialSelfAttention(nn.Module):
 def _layer_out_channels(layer):
     last = layer[-1]
     return getattr(last, "bn3", getattr(last, "bn2")).num_features
+
+
+class OrientedLineBranch(nn.Module):
+    """ver9.4 (line_base): 원본 96x96 웨이퍼 맵에서 얇은 선형(Scratch) 리지를 추출해 6x6으로 전달하는 보조 스트림."""
+
+    def __init__(self, out_dim=256, dropout=0.1):
+        super().__init__()
+        self.register_buffer("k9", self._make_oriented_kernels(9, n_ori=8), persistent=False)
+        self.register_buffer("k15", self._make_oriented_kernels(15, n_ori=8), persistent=False)
+        self.net = nn.Sequential(
+            nn.Conv2d(6, 24, 3, padding=1, bias=False),
+            nn.BatchNorm2d(24),
+            nn.GELU(),
+            nn.MaxPool2d(2),  # 96 -> 48
+            nn.Conv2d(24, 48, 3, padding=1, bias=False),
+            nn.BatchNorm2d(48),
+            nn.GELU(),
+            nn.MaxPool2d(2),  # 48 -> 24
+            nn.Conv2d(48, 96, 3, padding=1, bias=False),
+            nn.BatchNorm2d(96),
+            nn.GELU(),
+            nn.MaxPool2d(2),  # 24 -> 12
+            nn.Conv2d(96, 96, 3, padding=1, groups=96, bias=False),
+            nn.Conv2d(96, out_dim, 1, bias=False),
+            nn.BatchNorm2d(out_dim),
+            nn.GELU(),
+            nn.Dropout2d(dropout),
+            nn.MaxPool2d(2),  # 12 -> 6
+        )
+
+    @staticmethod
+    def _make_oriented_kernels(ks, sigma_v=0.14, v0=0.35, sigma_neg=0.18, sigma_u=0.75, n_ori=8):
+        coords = torch.linspace(-1.0, 1.0, ks)
+        yy, xx = torch.meshgrid(coords, coords, indexing="ij")
+        kernels = []
+        for k in range(n_ori):
+            th = k * math.pi / n_ori
+            c, s_ = math.cos(th), math.sin(th)
+            u = xx * c + yy * s_
+            v = -xx * s_ + yy * c
+            line = (
+                torch.exp(-(v ** 2) / (2 * sigma_v ** 2))
+                - 0.5 * torch.exp(-((v - v0) ** 2) / (2 * sigma_neg ** 2))
+                - 0.5 * torch.exp(-((v + v0) ** 2) / (2 * sigma_neg ** 2))
+            )
+            env = torch.exp(-(u ** 2) / (2 * sigma_u ** 2))
+            kern = line * env
+            kern = kern - kern.mean()
+            kern = kern / (kern.abs().sum() + 1e-8)
+            kernels.append(kern)
+        return torch.stack(kernels).unsqueeze(1)
+
+    @staticmethod
+    def _anom(defect, wafer):
+        mean_d = defect.sum(dim=(2, 3), keepdim=True) / wafer.sum(dim=(2, 3), keepdim=True).clamp_min(1.0)
+        return (defect - mean_d) * wafer
+
+    @staticmethod
+    def _resp(anom, wafer, kern):
+        pad = kern.shape[-1] // 2
+        r = F.conv2d(anom, kern, padding=pad)
+        mx = r.max(dim=1, keepdim=True).values
+        an = mx - r.mean(dim=1, keepdim=True)
+        return mx * wafer, an * wafer
+
+    def forward(self, x):
+        defect = (x > 0.75).to(x.dtype)
+        wafer = (x > 0.25).to(x.dtype)
+        anom = self._anom(defect, wafer)
+        max9, aniso9 = self._resp(anom, wafer, self.k9.to(x.dtype))
+        max15, aniso15 = self._resp(anom, wafer, self.k15.to(x.dtype))
+        feats = torch.cat((defect, anom, max9, aniso9, max15, aniso15), dim=1)
+        return self.net(feats)
+
+
+class IterativeSpatialBeliefAttention(nn.Module):
+    """ver9.5 (belief_base): 2D 상대 위치 연속성 + 칸별 클래스 belief 점등 + 가중치 공유 반복 추론(3-step)."""
+
+    def __init__(self, in_dim=256, num_classes=9, h=6, w=6, num_heads=4, num_steps=3, dropout=0.1):
+        super().__init__()
+        if in_dim % num_heads != 0:
+            raise ValueError(f"in_dim({in_dim}) must be divisible by num_heads({num_heads})")
+        self.in_dim = in_dim
+        self.num_classes = num_classes
+        self.h, self.w = h, w
+        self.num_heads = num_heads
+        self.head_dim = in_dim // num_heads
+        self.scale = self.head_dim ** -0.5
+        self.num_steps = num_steps
+
+        self.rel_pos_bias = nn.Parameter(torch.zeros(num_heads, (2 * h - 1) * (2 * w - 1)))
+        self.register_buffer("rel_pos_idx", self._build_rel_idx(h, w), persistent=False)
+
+        self.belief_norm = nn.LayerNorm(in_dim)
+        self.belief_head = nn.Linear(in_dim, num_classes)
+        self.belief_proj = nn.Linear(num_classes, in_dim, bias=False)
+        self.cell_gate = nn.Linear(in_dim, 1)
+        nn.init.zeros_(self.cell_gate.weight)
+        nn.init.zeros_(self.cell_gate.bias)
+
+        self.norm1 = nn.LayerNorm(in_dim)
+        self.qkv = nn.Linear(in_dim, in_dim * 3)
+        self.proj = nn.Linear(in_dim, in_dim)
+        self.attn_drop = nn.Dropout(dropout)
+        self.drop = nn.Dropout(dropout)
+
+        self.norm2 = nn.LayerNorm(in_dim)
+        self.ffn_fc1 = nn.Linear(in_dim, in_dim * 2)
+        self.ffn_dwconv = nn.Conv2d(in_dim * 2, in_dim * 2, kernel_size=3, padding=1, groups=in_dim * 2)
+        self.ffn_act = nn.GELU()
+        self.ffn_drop = nn.Dropout(dropout)
+        self.ffn_fc2 = nn.Linear(in_dim * 2, in_dim)
+
+        self.attn_scales = nn.Parameter(torch.full((num_steps,), 0.05))
+        self.ffn_scales = nn.Parameter(torch.full((num_steps,), 0.05))
+        self.last_step_logits = None
+
+    @staticmethod
+    def _build_rel_idx(h, w, device=None):
+        cy = torch.arange(h, device=device)
+        cx = torch.arange(w, device=device)
+        coords = torch.stack(torch.meshgrid(cy, cx, indexing="ij"), dim=0).flatten(1)
+        rel = coords[:, :, None] - coords[:, None, :]
+        rel_y = rel[0] + (h - 1)
+        rel_x = rel[1] + (w - 1)
+        return rel_y * (2 * w - 1) + rel_x
+
+    def _get_rel_bias(self, H, W, device, dtype):
+        if H == self.h and W == self.w:
+            bias = self.rel_pos_bias[:, self.rel_pos_idx]
+        else:
+            table = self.rel_pos_bias.view(1, self.num_heads, 2 * self.h - 1, 2 * self.w - 1)
+            table = F.interpolate(table, size=(2 * H - 1, 2 * W - 1), mode="bicubic", align_corners=False)
+            idx = self._build_rel_idx(H, W, device=device)
+            bias = table.view(self.num_heads, -1)[:, idx]
+        return bias.unsqueeze(0).to(dtype=dtype)
+
+    def _rel_mha(self, x, H, W):
+        B, N, C = x.shape
+        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, self.head_dim).permute(2, 0, 3, 1, 4)
+        q, k, v = qkv.unbind(0)
+        attn = (q.float() @ k.float().transpose(-2, -1)) * self.scale
+        attn = attn + self._get_rel_bias(H, W, x.device, torch.float32)
+        attn = self.attn_drop(attn.softmax(dim=-1)).to(v.dtype)
+        out = (attn @ v).transpose(1, 2).reshape(B, N, C)
+        return self.proj(out)
+
+    def _conv_ffn(self, x, H, W):
+        B = x.shape[0]
+        h = self.ffn_fc1(x)
+        h_2d = h.transpose(1, 2).reshape(B, -1, H, W)
+        h = self.ffn_dwconv(h_2d).flatten(2).transpose(1, 2)
+        h = self.ffn_drop(self.ffn_act(h))
+        return self.ffn_fc2(h)
+
+    def forward(self, x):
+        B, C, H, W = x.shape
+        tokens = x.flatten(2).transpose(1, 2)
+        step_logits = [] if self.training else None
+
+        for step in range(self.num_steps):
+            bn = self.belief_norm(tokens)
+            cell_logits = self.belief_head(bn)
+            belief = F.softmax(cell_logits.float(), dim=-1).to(tokens.dtype)
+            ctx_in = self.norm1(tokens) + self.belief_proj(belief)
+            attn_out = self._rel_mha(ctx_in, H, W)
+            tokens = tokens + self.attn_scales[step] * self.drop(attn_out)
+            tokens = tokens + self.ffn_scales[step] * self.drop(self._conv_ffn(self.norm2(tokens), H, W))
+            if step_logits is not None:
+                post_bn = self.belief_norm(tokens)
+                post_logits = self.belief_head(post_bn).float()
+                w = F.softmax(self.cell_gate(post_bn).float(), dim=1)
+                step_logits.append((post_logits * w).sum(dim=1))
+
+        self.last_step_logits = step_logits
+        return tokens.transpose(1, 2).reshape(B, C, H, W)
+
+
+class SpatialEvidencePooling(nn.Module):
+    """ver9.6 (pool_base): 균등 AvgPool 대신 결함 신호가 켜진 공간 칸에 가중치를 집중하는 0-초기화 어텐션 풀링."""
+
+    def __init__(self, in_dim=512, hidden_dim=128, dropout=0.1):
+        super().__init__()
+        self.norm = nn.LayerNorm(in_dim)
+        self.gate = nn.Sequential(
+            nn.Linear(in_dim, hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, 1),
+        )
+        nn.init.zeros_(self.gate[-1].weight)
+        nn.init.zeros_(self.gate[-1].bias)
+
+    def forward(self, x):
+        B, C, H, W = x.shape
+        tokens = x.flatten(2).transpose(1, 2)
+        scores = self.gate(self.norm(tokens)).float()
+        weights = F.softmax(scores, dim=1).to(x.dtype)
+        pooled = (tokens * weights).sum(dim=1)
+        return pooled.unsqueeze(-1).unsqueeze(-1)
 
 
 class AddDilated(nn.Module):
@@ -256,6 +457,30 @@ def build_model(arch, num_classes, in_ch=1):
         elif USE_SA == "layer2":
             dim = _layer_out_channels(m.layer2)
             m.layer2.add_module("sa", SpatialSelfAttention(in_dim=dim, h=12, w=12, num_heads=4, dropout=0.1, use_gate=True))
+        elif USE_SA == "line_base":
+            dim3 = _layer_out_channels(m.layer3)
+            m.line_branch = OrientedLineBranch(out_dim=dim3, dropout=0.1)
+            m.line_scale = nn.Parameter(torch.tensor(0.05))
+
+            def _forward_features_line(x):
+                f_line = m.line_branch(x)
+                h = m.maxpool(m.relu(m.bn1(m.conv1(x))))
+                h = m.layer3(m.layer2(m.layer1(h)))
+                if f_line.shape[-2:] != h.shape[-2:]:
+                    f_line = F.adaptive_max_pool2d(f_line, h.shape[-2:])
+                h = h + m.line_scale * f_line
+                h = m.avgpool(m.layer4(h))
+                return torch.flatten(h, 1)
+
+            m.forward_features = _forward_features_line
+            m._forward_impl = lambda x: m.fc(_forward_features_line(x))
+        elif USE_SA == "belief_base":
+            dim3 = _layer_out_channels(m.layer3)
+            m.layer3.add_module(
+                "sa", IterativeSpatialBeliefAttention(in_dim=dim3, num_classes=num_classes, h=6, w=6, num_heads=4, num_steps=3, dropout=0.1)
+            )
+        elif USE_SA == "pool_base":
+            m.avgpool = SpatialEvidencePooling(in_dim=m.fc.in_features, hidden_dim=128, dropout=0.1)
         else:
             raise ValueError(f"Unknown USE_SA: {USE_SA}")
     return m
