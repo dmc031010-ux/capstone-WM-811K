@@ -481,6 +481,28 @@ def build_model(arch, num_classes, in_ch=1):
             )
         elif USE_SA == "pool_base":
             m.avgpool = SpatialEvidencePooling(in_dim=m.fc.in_features, hidden_dim=128, dropout=0.1)
+        elif USE_SA == "three_base":
+            dim3 = _layer_out_channels(m.layer3)
+            m.line_branch = OrientedLineBranch(out_dim=dim3, dropout=0.1)
+            m.line_scale = nn.Parameter(torch.tensor(0.05))
+            m.layer3_sa = IterativeSpatialBeliefAttention(
+                in_dim=dim3, num_classes=num_classes, h=6, w=6, num_heads=4, num_steps=3, dropout=0.1
+            )
+            m.avgpool = SpatialEvidencePooling(in_dim=m.fc.in_features, hidden_dim=128, dropout=0.1)
+
+            def _forward_features_three(x):
+                f_line = m.line_branch(x)
+                h = m.maxpool(m.relu(m.bn1(m.conv1(x))))
+                h = m.layer3(m.layer2(m.layer1(h)))
+                if f_line.shape[-2:] != h.shape[-2:]:
+                    f_line = F.adaptive_max_pool2d(f_line, h.shape[-2:])
+                h = h + m.line_scale * f_line
+                h = m.layer3_sa(h)
+                h = m.avgpool(m.layer4(h))
+                return torch.flatten(h, 1)
+
+            m.forward_features = _forward_features_three
+            m._forward_impl = lambda x: m.fc(_forward_features_three(x))
         else:
             raise ValueError(f"Unknown USE_SA: {USE_SA}")
     return m

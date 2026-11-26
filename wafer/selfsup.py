@@ -204,6 +204,7 @@ def finetune(ds, lab_idx, sub, enc_path, args, out_dir, device):
             "line_base": ("line_branch.", "line_scale"),
             "belief_base": ("layer3.sa.",),
             "pool_base": ("avgpool.",),
+            "three_base": ("line_branch.", "line_scale", "layer3_sa.", "avgpool."),
         }.get(sa_mode, ("avgpool.0.",))
         assert expected_missing <= actual_missing, missing
         assert actual_missing - expected_missing == {k for k in actual_missing if k.startswith(sa_prefixes)}, missing
@@ -319,7 +320,7 @@ def finetune(ds, lab_idx, sub, enc_path, args, out_dir, device):
                 if args.triplet:
                     loss = loss + args.triplet * Lt
                 if aux_w > 0.0:
-                    sa_mod = getattr(model.layer3, "sa", None)
+                    sa_mod = getattr(model, "layer3_sa", None) or getattr(model.layer3, "sa", None)
                     step_logits = getattr(sa_mod, "last_step_logits", None)
                     if step_logits:
                         n_st = len(step_logits)
