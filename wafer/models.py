@@ -3,6 +3,7 @@ import os
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torchvision
 
 from . import augment as A
@@ -13,6 +14,66 @@ DEFAULT_BATCH = {"resnet18": 256, "resnet34": 256, "resnet50": 128, "densenet121
 INPUT_DILATE = 0
 # True 면 ImageNet 사전학습 가중치로 시작 (CLI --imagenet 이 설정). 첫 conv 는 RGB 가중치를 채널 합으로 1채널화
 IMAGENET = False
+# ver9.2: True/"layer4" 이면 layer4 뒤(3x3), "layer3" 이면 6x6, "layer2" 이면 12x12 에 SpatialSelfAttention 추가
+USE_SA = False
+
+
+class PositionalEncoding2D(nn.Module):
+    """(B, C, H, W) 특징 맵에 더해주는 학습 가능한 2D 위치 임베딩."""
+
+    def __init__(self, channels, h=3, w=3):
+        super().__init__()
+        self.pos_emb = nn.Parameter(torch.randn(1, channels, h, w) * 0.02)
+
+    def forward(self, x):
+        pos_emb = self.pos_emb
+        if pos_emb.shape[-2:] != x.shape[-2:]:
+            pos_emb = F.interpolate(pos_emb, size=x.shape[-2:], mode="bicubic", align_corners=False)
+        return x + pos_emb
+
+
+class SpatialSelfAttention(nn.Module):
+    """ver9.2: (B, C, H, W) 특징 맵의 spatial grid(H*W 토큰) 간 Multi-Head Self-Attention."""
+
+    def __init__(self, in_dim=512, h=3, w=3, num_heads=4, dropout=0.0, use_gate=False):
+        super().__init__()
+        self.use_gate = use_gate
+        self.pos_enc = PositionalEncoding2D(in_dim, h, w)
+        self.norm1 = nn.LayerNorm(in_dim)
+        self.mha = nn.MultiheadAttention(embed_dim=in_dim, num_heads=num_heads, dropout=dropout, batch_first=True)
+        self.norm2 = nn.LayerNorm(in_dim)
+        ffn_layers = [nn.Linear(in_dim, in_dim * 2), nn.GELU()]
+        if dropout > 0.0:
+            ffn_layers.append(nn.Dropout(dropout))
+        ffn_layers.append(nn.Linear(in_dim * 2, in_dim))
+        self.ffn = nn.Sequential(*ffn_layers)
+        if use_gate:
+            self.drop = nn.Dropout(dropout)
+            self.attn_scale = nn.Parameter(torch.zeros(()))
+            self.ffn_scale = nn.Parameter(torch.zeros(()))
+
+    def forward(self, x):
+        B, C, H, W = x.shape
+        if self.use_gate:
+            base = x.flatten(2).transpose(1, 2)  # (B, H*W, C), 초기에는 사전학습 특징 그대로 보존
+            x_pos = self.pos_enc(x).flatten(2).transpose(1, 2)
+            norm_tokens = self.norm1(x_pos)
+            attn_out, _ = self.mha(norm_tokens, norm_tokens, norm_tokens)
+            tokens = base + self.attn_scale * self.drop(attn_out)
+            tokens = tokens + self.ffn_scale * self.drop(self.ffn(self.norm2(tokens)))
+            return tokens.transpose(1, 2).reshape(B, C, H, W)
+        x = self.pos_enc(x)
+        tokens = x.flatten(2).transpose(1, 2)  # (B, H*W, C)
+        norm_tokens = self.norm1(tokens)
+        attn_out, _ = self.mha(norm_tokens, norm_tokens, norm_tokens)
+        tokens = tokens + attn_out
+        tokens = tokens + self.ffn(self.norm2(tokens))
+        return tokens.transpose(1, 2).reshape(B, C, H, W)
+
+
+def _layer_out_channels(layer):
+    last = layer[-1]
+    return getattr(last, "bn3", getattr(last, "bn2")).num_features
 
 
 class AddDilated(nn.Module):
@@ -182,6 +243,21 @@ def build_model(arch, num_classes, in_ch=1):
         m.features.conv0 = nn.Conv2d(in_ch, 64, 7, 2, 3, bias=False)
     else:
         raise ValueError(arch)
+    if USE_SA and arch.startswith("resnet"):
+        if USE_SA in (True, "layer4"):
+            dim = m.fc.in_features
+            m.avgpool = nn.Sequential(
+                SpatialSelfAttention(in_dim=dim, h=3, w=3, num_heads=4),
+                nn.AdaptiveAvgPool2d((1, 1)),
+            )
+        elif USE_SA == "layer3":
+            dim = _layer_out_channels(m.layer3)
+            m.layer3.add_module("sa", SpatialSelfAttention(in_dim=dim, h=6, w=6, num_heads=4, dropout=0.1, use_gate=True))
+        elif USE_SA == "layer2":
+            dim = _layer_out_channels(m.layer2)
+            m.layer2.add_module("sa", SpatialSelfAttention(in_dim=dim, h=12, w=12, num_heads=4, dropout=0.1, use_gate=True))
+        else:
+            raise ValueError(f"Unknown USE_SA: {USE_SA}")
     return m
 
 

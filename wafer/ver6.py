@@ -25,19 +25,74 @@ V6 = dict(n_masks=4, mask_area=0.2, ema=0.996)
 V61 = dict(n_masks=4, cell=12, ema=0.996)
 
 
+class InterViewSelfAttention(nn.Module):
+    """ver9.3A: 마스킹된 뷰 예측 벡터들 간 Self-Attention 후 뷰별 가중치를 학습해 결합."""
+
+    def __init__(self, dim, num_heads=4):
+        super().__init__()
+        self.norm = nn.LayerNorm(dim)
+        self.attn = nn.MultiheadAttention(dim, num_heads, batch_first=True)
+        self.attn_scale = nn.Parameter(torch.zeros(()))
+        self.score = nn.Linear(dim, 1)
+        nn.init.zeros_(self.score.weight)
+        nn.init.zeros_(self.score.bias)
+
+    def forward(self, p):
+        normed = self.norm(p)
+        contextual, attn_weights = self.attn(normed, normed, normed, need_weights=True,
+                                             average_attn_weights=False)
+        refined = p + self.attn_scale * contextual
+        weights = self.score(self.norm(refined)).squeeze(-1).softmax(dim=1)
+        pooled = (refined * weights.unsqueeze(-1)).sum(dim=1)
+        return pooled, weights, attn_weights.detach()
+
+
+class TargetConditionedViewGate(nn.Module):
+    """ver9.3C: 뷰 간 어텐션 + EMA 타깃 벡터 z 와의 관계를 함께 보고 뷰별 가중치를 산출."""
+
+    def __init__(self, dim, num_heads=4):
+        super().__init__()
+        self.view_norm = nn.LayerNorm(dim)
+        self.target_norm = nn.LayerNorm(dim)
+        self.attn = nn.MultiheadAttention(dim, num_heads, batch_first=True)
+        self.attn_scale = nn.Parameter(torch.zeros(()))
+        self.score = nn.Sequential(
+            nn.Linear(dim * 4, dim),
+            nn.GELU(),
+            nn.Linear(dim, 1),
+        )
+        nn.init.zeros_(self.score[-1].weight)
+        nn.init.zeros_(self.score[-1].bias)
+
+    def forward(self, p, z):
+        normed = self.view_norm(p)
+        contextual, attn_weights = self.attn(normed, normed, normed, need_weights=True,
+                                              average_attn_weights=False)
+        refined = p + self.attn_scale * contextual
+        target = self.target_norm(z).unsqueeze(1).expand_as(refined)
+        view = self.view_norm(refined)
+        gate_input = torch.cat((view, target, (view - target).abs(), view * target), dim=-1)
+        weights = self.score(gate_input).squeeze(-1).softmax(dim=1)
+        pooled = (refined * weights.unsqueeze(-1)).sum(dim=1)
+        return pooled, weights, attn_weights.detach()
+
+
 class MaskedLatentModel(nn.Module):
     """Encoder(ResNet-18, 512) + Predictor. 타깃 인코더는 온라인 인코더의 EMA 복사본.
 
     mlp=False: 선형 Predictor(512→512, ver6) / mlp=True: 512→512→512 (BN+ReLU, BYOL 구조, ver6.1)
     """
 
-    def __init__(self, arch, mlp=False, size=None):
+    def __init__(self, arch, mlp=False, view_attention=False, view_gate_mode=None, size=None):
         super().__init__()
         self.encoder, dim = _encoder(arch)
         if size is not None:   # ver8.2: 인코더 (온라인 / 타깃 모두) 를 크기 조건 FiLM ResNet 으로
             self.encoder = FiLMResNet(self.encoder, size)
         self.predictor = (nn.Sequential(nn.Linear(dim, dim), nn.BatchNorm1d(dim), nn.ReLU(inplace=True), nn.Linear(dim, dim))
                           if mlp else nn.Linear(dim, dim))
+        self.view_gate_mode = view_gate_mode
+        self.view_agg = (InterViewSelfAttention(dim) if view_attention else
+                         TargetConditionedViewGate(dim) if view_gate_mode == "target_conditioned" else None)
         self.target = copy.deepcopy(self.encoder).requires_grad_(False)
 
     @torch.no_grad()
@@ -69,7 +124,7 @@ def _predict(model, xm, bn_groups=None, idx=None):
     return f(xm.flatten(0, 1)).view(n, b, -1)
 
 
-def consistency_loss(model, x, xm, per_view=False, bn_groups=None, idx=None):
+def consistency_loss(model, x, xm, per_view=False, bn_groups=None, idx=None, view_gate_tau=0.2, view_gate_lambda=0.05):
     """x: 원본 (B,1,H,W), xm: 마스킹본 (n,B,1,H,W). 반환: (loss, 원본 벡터 z).
 
     per_view=False: 1 - cos(mean(p_i), z) (ver6~ver7) / True: mean_i (1 - cos(p_i, z)) (ver7.2)
@@ -81,8 +136,23 @@ def consistency_loss(model, x, xm, per_view=False, bn_groups=None, idx=None):
     p = _predict(model, xm, bn_groups, idx).float()
     if per_view:                                       # 마스킹본 각각을 z 와 비교한 뒤 손실 평균
         return 1 - F.cosine_similarity(p, z.unsqueeze(0), dim=2).mean(), z
-    p = p.mean(0)                                      # 4개 예측 벡터의 앙상블 평균
-    return 1 - F.cosine_similarity(p, z, dim=1).mean(), z
+    p_views = p.transpose(0, 1)                        # (B, views, D)
+    gate_loss = z.new_zeros(())
+    if model.view_gate_mode == "target_similarity":
+        w = (F.cosine_similarity(p_views, z.unsqueeze(1), dim=-1).detach() / view_gate_tau).softmax(dim=1)
+        pooled = (p_views * w.unsqueeze(-1)).sum(dim=1)
+    elif model.view_gate_mode == "target_conditioned":
+        pooled, w, _ = model.view_agg(p_views, z)
+        quality = (F.cosine_similarity(p_views, z.unsqueeze(1), dim=-1).detach() / view_gate_tau).softmax(dim=1)
+        gate_loss = F.kl_div(w.clamp_min(1e-8).log(), quality, reduction="batchmean")
+    elif model.view_agg is not None:
+        pooled, _, _ = model.view_agg(p_views)
+    else:
+        pooled = p.mean(0)                             # ver6~ver7: 4개 예측 벡터의 앙상블 평균
+    loss = 1 - F.cosine_similarity(pooled, z, dim=1).mean()
+    if model.view_gate_mode == "target_conditioned":
+        loss = loss + view_gate_lambda * gate_loss
+    return loss, z
 
 
 def _views(x, v61, cell=V61["cell"], n_masks=V61["n_masks"], ratio=0.5, dilate=0, stripes=False, crop=False):
@@ -107,8 +177,8 @@ def _views(x, v61, cell=V61["cell"], n_masks=V61["n_masks"], ratio=0.5, dilate=0
 
 
 def pretrain(ds, sub, args, device, out_path, v61=False, cell=V61["cell"], n_masks=V61["n_masks"], ratio=0.5, mlp=None,
-             per_view=False, dilate=0, stripes=False, curriculum=None, lab_idx=None, triplet_w=0.0, crop=False, bn_groups=None,
-             size=None):
+             per_view=False, dilate=0, stripes=False, curriculum=None, lab_idx=None, triplet_w=0.0, crop=False,
+             view_attention=False, view_gate_mode=None, bn_groups=None, size=None):
     """Phase 1. 온라인 인코더(state_dict, fc 제외)를 저장 — selfsup.finetune 이 그대로 읽음.
 
     cell: 바둑판 칸 크기 (ver6.1 = 12, ver6.2~ = 6), n_masks: 마스킹본 수 (ver6.3 = 3), ratio: 가리는 비율 (ver6.4 = 0.3)
@@ -118,14 +188,18 @@ def pretrain(ds, sub, args, device, out_path, v61=False, cell=V61["cell"], n_mas
     curriculum: 에폭 절반씩 마스킹 단계 전환 — "stripe_first" 줄무늬 → 바둑판 (ver7.X1), "checker_first" 반대 (ver7.95)
     lab_idx, triplet_w: 매 스텝 라벨 데이터 128장 (클래스 균형, 회전만) 의 인코더 특징에 batch-hard Triplet 추가 (ver7.X2)
     crop: 마스킹본만 무작위 크기 자르기 (ver7.X)
+    view_attention, view_gate_mode: ver9.3A/B/C 멀티뷰 어텐션/게이트 결합
     bn_groups: 마스킹본의 BN 묶음 (_predict 참고, 치팅 검증용)
     size: 웨이퍼별 표준화 log(die 수) 표 — 주면 인코더가 FiLM 으로 크기 조건을 받음 (ver8.2)
     """
     set_seed(args.seed)
     cfg = V61 if v61 else V6
     assert size is None or not (triplet_w or bn_groups)
-    model = MaskedLatentModel(args.arch, mlp=v61 if mlp is None else mlp, size=size).to(device)
+    model = MaskedLatentModel(args.arch, mlp=v61 if mlp is None else mlp,
+                              view_attention=view_attention, view_gate_mode=view_gate_mode, size=size).to(device)
     params = list(model.encoder.parameters()) + list(model.predictor.parameters())
+    if model.view_agg is not None:
+        params += list(model.view_agg.parameters())
     opt = torch.optim.AdamW(params, lr=V3["ssl_lr"], weight_decay=1e-4)
     B = args.batch_size
     steps = len(sub) // B
@@ -148,6 +222,8 @@ def pretrain(ds, sub, args, device, out_path, v61=False, cell=V61["cell"], n_mas
         print(f"--- resume from {ckpt_path} (epoch {ck['ep']} done)", flush=True)
     for ep in range(start, args.ssl_epochs + 1):
         model.encoder.train(); model.predictor.train()
+        if model.view_agg is not None:
+            model.view_agg.train()
         t, tot, zstd, tl = time.time(), 0.0, 0.0, 0.0
         if curriculum:
             first = ep <= args.ssl_epochs // 2

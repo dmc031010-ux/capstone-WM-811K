@@ -20,6 +20,7 @@ import torch.nn.functional as F
 from sklearn.metrics import normalized_mutual_info_score
 
 from . import augment as A
+from . import models as wmodels
 from .data import CLASSES, NUM_CLASSES
 from .engine import BalancedSampler, _Tracker, set_seed
 from .models import ClassPool, FiLMFeatures, FiLMResNet, FrangiFeatures, FrangiInput, SizeHead, build_model, load_size, to_input
@@ -184,7 +185,18 @@ def finetune(ds, lab_idx, sub, enc_path, args, out_dir, device):
         assert len(model.size) == len(ds.labels)
     model = model.to(device)
     missing = model.load_state_dict(torch.load(enc_path, map_location=device, weights_only=True), strict=False)
-    assert set(missing.missing_keys) == {"fc.weight", "fc.bias"}, missing
+    expected_missing = {"fc.weight", "fc.bias"}
+    actual_missing = set(missing.missing_keys)
+    sa_mode = getattr(wmodels, "USE_SA", False)
+    if sa_mode:
+        sa_prefixes = {
+            "layer3": ("layer3.sa.",),
+            "layer2": ("layer2.sa.",),
+        }.get(sa_mode, ("avgpool.0.",))
+        assert expected_missing <= actual_missing, missing
+        assert actual_missing - expected_missing == {k for k in actual_missing if k.startswith(sa_prefixes)}, missing
+    else:
+        assert actual_missing == expected_missing, missing
     if getattr(args, "frangi", None):   # ver9.1 (yeeun 브랜치 y9.2a): ver8 인코더 + 입력 2채널 (Frangi; "zero" = 0 채널 대조군), 새 채널 가중치 0 에서 시작
         assert args.v3_nopl and not (args.size_head or args.film or args.class_pool or args.triplet)
         table, row = None, None
