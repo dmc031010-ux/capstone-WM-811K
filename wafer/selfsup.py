@@ -22,7 +22,7 @@ from sklearn.metrics import normalized_mutual_info_score
 from . import augment as A
 from .data import CLASSES, NUM_CLASSES
 from .engine import BalancedSampler, _Tracker, set_seed
-from .models import ClassPool, FiLMFeatures, FiLMResNet, SizeHead, build_model, load_size, to_input
+from .models import ClassPool, FiLMFeatures, FiLMResNet, FrangiFeatures, FrangiInput, SizeHead, build_model, load_size, to_input
 
 V3 = dict(
     r0=0.02, n_sub=100_000,             # 자기지도 데이터: 불량 비율 >= 2% 인 unlabeled 중 10만 장 (사용자 결정)
@@ -185,6 +185,15 @@ def finetune(ds, lab_idx, sub, enc_path, args, out_dir, device):
     model = model.to(device)
     missing = model.load_state_dict(torch.load(enc_path, map_location=device, weights_only=True), strict=False)
     assert set(missing.missing_keys) == {"fc.weight", "fc.bias"}, missing
+    if getattr(args, "frangi", None):   # ver9.1 (yeeun 브랜치 y9.2a): ver8 인코더 + 입력 2채널 (Frangi; "zero" = 0 채널 대조군), 새 채널 가중치 0 에서 시작
+        assert args.v3_nopl and not (args.size_head or args.film or args.class_pool or args.triplet)
+        table, row = None, None
+        if args.frangi == "frangi":
+            from .frangi import cache_paths
+            pu, pi = cache_paths(args.cache)
+            table = torch.from_numpy(np.load(pu)); gi = np.load(pi)
+            row = np.full(len(ds.labels), -1, np.int64); row[gi] = np.arange(len(gi))
+        model = FrangiInput(model, table, row).to(device)
     if args.size_head:  # ver8.1: 분류기 직전에 크기 임베딩 (die 수 → log → 표준화)
         assert args.v3_nopl and not args.triplet
         d = np.log(np.load(os.path.join(args.cache, "wm811k_shapes_dies.npy"))[:, 2].astype(np.float64))
@@ -214,6 +223,7 @@ def finetune(ds, lab_idx, sub, enc_path, args, out_dir, device):
     cw[CLASSES.index("Scratch")] = args.scratch_w
     tracker = _Tracker(out_dir, model, ds, device, args, dict(n_labeled=len(lab_idx), n_sub=len(sub), stage="ver3", v3=V3, rounds=[]))
     feat_model = (model.base if args.size_head else FiLMFeatures(model) if args.film
+                  else FrangiFeatures(model) if getattr(args, "frangi", None)
                   else nn.Sequential(*list(model.base.children())[:-1], nn.Flatten()) if args.class_pool
                   else nn.Sequential(*list(model.children())[:-1], nn.Flatten()))   # fc 앞 특징 (가중치 공유)
     ep = 0
@@ -249,7 +259,10 @@ def finetune(ds, lab_idx, sub, enc_path, args, out_dir, device):
                 li = lab_idx[lsampler(B)]
                 yl = torch.from_numpy(ds.labels[li]).to(device)
                 with torch.no_grad():
-                    xl = A.weak(ds.fetch(li, device), "rotate")
+                    xl = ds.fetch(li, device)
+                    if getattr(args, "frangi", None):   # 회전 전에 붙여 두 채널이 같은 회전 (nearest). ×2 → to_input (×0.5) 뒤 [0,1]
+                        xl = torch.cat([xl, 2 * model.frangi(li, device)], 1)
+                    xl = A.weak(xl, "rotate")
                     if psampler:
                         j = psampler(args.mu * B // 2)
                         xp = A.strong(ds.fetch(p_idx[j], device), None, 0.0, keep=False, ops=_ops(args))

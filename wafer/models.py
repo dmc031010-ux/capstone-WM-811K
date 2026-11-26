@@ -119,6 +119,51 @@ class FiLMFeatures(nn.Module):
         return self.m.features(x, idx)
 
 
+class FrangiInput(nn.Module):
+    """ver9.1 (yeeun 브랜치 y9.2a): 입력 2채널 (원본, Frangi vesselness). conv1 을 2채널로 늘리고 원래 가중치는 채널 0, 새 채널 1 은 0 으로 시작.
+    forward(x, idx): x 가 1채널이면 idx (전역 웨이퍼 번호) 로 표에서 Frangi 를 찾아 붙임 (평가·군집 진단).
+    이미 2채널이면 그대로 (학습: 회전 전에 붙여서 두 채널이 같은 회전을 받음).
+    table: (n, 96, 96) uint8 (V×255) CPU, row: (전체 웨이퍼 수,) 전역 번호 → 표의 행 (-1 = 없음). table=None 이면 0 채널 (대조군)."""
+
+    needs_idx = True
+
+    def __init__(self, base, table, row):
+        super().__init__()
+        w = base.conv1.weight.data
+        base.conv1 = nn.Conv2d(2, w.shape[0], 7, 2, 3, bias=False).to(w.device)
+        base.conv1.weight.data.zero_()
+        base.conv1.weight.data[:, :1] = w
+        self.base, self.table, self.row = base, table, row
+
+    def frangi(self, idx, device):
+        idx = np.asarray(idx.cpu() if torch.is_tensor(idx) else idx)
+        if self.table is None:
+            return torch.zeros(len(idx), 1, 96, 96, device=device)
+        r = self.row[idx]
+        assert (r >= 0).all(), "Frangi 표에 없는 웨이퍼"
+        return self.table[torch.from_numpy(r)].to(device, non_blocking=True).float().unsqueeze(1) / 255.0
+
+    def add(self, x, idx):
+        return x if x.shape[1] == 2 else torch.cat([x, self.frangi(idx, x.device).to(x.dtype)], 1)
+
+    def forward(self, x, idx=None):
+        return self.base(self.add(x, idx))
+
+
+class FrangiFeatures(nn.Module):
+    """ver9.1: FrangiInput 의 fc 앞 특징 (군집 진단용, 가중치 공유)."""
+
+    needs_idx = True
+
+    def __init__(self, m):
+        super().__init__()
+        self.m = m
+        self.body = nn.Sequential(*list(m.base.children())[:-1], nn.Flatten())
+
+    def forward(self, x, idx=None):
+        return self.body(self.m.add(x, idx))
+
+
 def build_model(arch, num_classes, in_ch=1):
     """WBM 은 단일 채널 → 첫 conv 를 1채널로 교체 (기본: ImageNet 사전학습 없음, WaPIRL 과 동일)."""
     if IMAGENET and arch.startswith("resnet") and in_ch == 1 and not INPUT_DILATE:
