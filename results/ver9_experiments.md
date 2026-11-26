@@ -1,4 +1,4 @@
-# `ver9` 아키텍처 & 실험 가이드 (`ver9.1` ~ `ver9.7`)
+# `ver9` 아키텍처 & 실험 가이드 (`ver9.1` ~ `ver9.8`)
 
 이 문서는 `main` 브랜치에 병합된 `ver9` 계열 실험(`ResNet-18`, WM-811K `96×96`, 5% 라벨 6,919장 + Unlabeled 100,000장, `split_seed=0`)의 **도입 목적 · 동작 원리 · 코드 위치 · 실측 수치 · 실행 CLI**를 정리한 기술 명세서입니다. (사람 및 AI 코딩 에이전트 모두 이 문서를 기준으로 코드 구조와 실험 이력을 파악할 수 있습니다.)
 
@@ -22,6 +22,8 @@
 | **`ver9.6`** | **`Pool` 기본형** | `masklat7_e50.pt` | `"pool_base"` | `0.8147` | `0.8275` | `0.4396` (`60/120`, `82`) | `runs/.../seed0/ver9.6_ssl50_ft30/metrics.json` |
 | **`ver9.7A`** | **`ver7` + 3모듈 통합** | `masklat7_e50.pt` | `"three_base"`, `aux_belief_w=0.3` | `0.8272` | `0.8297` | `0.5900` (`59/120`, `17`) | `runs/.../seed0/ver9.7A_ssl50_ft30/metrics.json` |
 | **`ver9.7B`** ⭐ | **`SimCLR` + 3모듈 통합** | `simclr_random_cut_e50.pt` | `"three_base"`, `aux_belief_w=0.3` | `0.8251` | **`0.8640`** | `0.6204` (`67/120`, `24`) | `runs/.../seed0/ver9.7B_ssl50_ft30/metrics.json` |
+| **`ver9.8A`** ⭐ | **`ver9.7A` + 안정화 레시피** | `masklat7_e50.pt` | `"three_base"` + 5종 레시피 (`feat/hanbandoche ver9.4`) | - | **`0.8527 ± 0.0001`** *(2-seed)* | **`0.6777 ± 0.0000`** | - |
+| **`ver9.8B`** ⭐ | **`ver9.7B` + 안정화 레시피** | `simclr_random_cut_e50.pt` | `"three_base"` + 5종 레시피 (`feat/hanbandoche ver9.4_simclr`) | - | **`0.8674`** | `0.6585` | - |
 
 ---
 
@@ -87,6 +89,19 @@ WM-811K에서 `Scratch`가 가장 자주 `none`으로 오분류되는 원인을 
   - **`ver9.7A`** (`ver7` MaskLat 백본 + 3모듈): `seed=0` Test `0.8297`, Scratch `0.5900` (`seed=1`: Test `0.8457`, Scratch `0.6696`).
   - **`ver9.7B`** (`SimCLR` `ver3` 백본 + 3모듈): `seed=0` **Test `0.8640`** (`SimCLR` 단독 `0.8391` 대비 **`+2.49%p`**), Scratch `0.6204` (`TP=67/120`, `n→S=24`).
 
+### `ver9.8` (`ver9.8A` · `ver9.8B`): 3모듈 + 5종 파인튜닝 안정화 레시피 (`feat/hanbandoche` `ver9.4` · `ver9.4_simclr`)
+- **파일**: `wafixmatch.py` (`--method ver9.8A / ver9.8B`), `wafer/selfsup.py` (`attn_wd`, `warmup_epochs`+`cosine`, `label_smoothing`, `use_hflip`), `wafer/models.py` (`USE_SA="three_base"`)
+- **도입 목적**: `ver9.7`(순정 고정 LR + `1:1` 균형 샘플링)의 **과도한 `none→defect` 오탐**과 **실행·seed 간 변동성**을 없애고, 전 클래스 성능과 다중 seed 일관성을 극대화하기 위해 도입.
+- **5종 안정화 레시피**:
+  1. `sample_pow = 0.35`: 완전 `1:1` 균형 대신 장수 비례 완화로 `none→defect` 오탐 절반 이상 억제
+  2. `label_smoothing = 0.05`: 5% 소량 라벨 과적합/과신 방지 (`Ls`, `La` 동시 적용)
+  3. `attn_wd = 0.02`: 새로 추가된 `Line/Belief/Pool/fc` 가중치에만 강한 Weight Decay 분리 적용
+  4. `warmup_epochs = 5 + cosine` (`0.1→1.0→0.05`): 초반 사전학습 백본 보호 후 부드러운 코사인 수렴
+  5. `use_hflip = True`: 약증강에 회전 외에 좌우 반전(`A.hflip`) 추가 (`+ aux_belief_w=0.3`, `grad_clip=1.0`)
+- **검증 결과**:
+  - **`ver9.8A`** (`ver7` 인코더): 2-seed Test **`0.8527 ± 0.0001`**, Scratch **`0.6777 ± 0.0000`** (seed 편차 사실상 0 달성)
+  - **`ver9.8B`** (`SimCLR` 인코더): `seed=0` Test **`0.8674`**, Scratch **`0.6585`** (`Scratch`는 바둑판 마스킹 `ver9.8A`가 `+1.92%p` 우위)
+
 ---
 
 ## 4. 실행 CLI 예시
@@ -106,4 +121,8 @@ python wafixmatch.py run --frac 0.05 --seed 0 --method ver9.6
 # ver9.7A / ver9.7B (3모듈 통합 기본형: ver7 / SimCLR 백본)
 python wafixmatch.py run --frac 0.05 --seed 0 --method ver9.7A
 python wafixmatch.py run --frac 0.05 --seed 0 --method ver9.7B
+
+# ver9.8A / ver9.8B (3모듈 + 5종 안정화 레시피: ver7 / SimCLR 백본)
+python wafixmatch.py run --frac 0.05 --seed 0 --method ver9.8A
+python wafixmatch.py run --frac 0.05 --seed 0 --method ver9.8B
 ```

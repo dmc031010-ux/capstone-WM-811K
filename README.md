@@ -9,7 +9,7 @@ WM-811K 웨이퍼 빈맵(WBM, `96×96`, 9-class, 5% 라벨 6,919장 + Unlabeled 
 - `wafer/selfsup.py`: SimCLR 사전학습(`ver3`) 및 라벨 미세조정 파이프라인
 - `wafer/frangi.py`: `ver9.1` Frangi vesselness 2D 선 강조 필터
 - [`results/ver6_experiments.md`](./results/ver6_experiments.md): `ver3` ~ `ver7` 실험 기록
-- **[`results/ver9_experiments.md`](./results/ver9_experiments.md)**: **`ver9.1` ~ `ver9.7` 도입 목적 · 동작 원리 · 코드 위치 · 실측 수치 · CLI 가이드**
+- **[`results/ver9_experiments.md`](./results/ver9_experiments.md)**: **`ver9.1` ~ `ver9.8` 도입 목적 · 동작 원리 · 코드 위치 · 실측 수치 · CLI 가이드**
 
 ## `ver9` 버전 인덱스 (`main` 브랜치)
 | 버전 (`--method`) | 요약 | 핵심 모듈 / 위치 |
@@ -21,5 +21,6 @@ WM-811K 웨이퍼 빈맵(WBM, `96×96`, 9-class, 5% 라벨 6,919장 + Unlabeled 
 | `ver9.5` | `Belief` 기본형: `layer3` 6×6 3-step 반복 공간 신념 추론 | `IterativeSpatialBeliefAttention` (`wafer/models.py`) |
 | `ver9.6` | `Pool` 기본형: 0-초기화 공간 증거 게이트 풀링 | `SpatialEvidencePooling` (`wafer/models.py`) |
 | `ver9.7A / 9.7B` | **3모듈(`Line+Belief+Pool`) 통합 기본형** (`ver7` / `SimCLR` 백본) | `USE_SA="three_base"` (`wafer/models.py`) |
+| `ver9.8A / 9.8B` | **`ver9.7` + 5종 안정화 레시피** (`ver7` `0.8527±0.0001` / `SimCLR` `0.8674`) | `USE_SA="three_base"` + `wafer/selfsup.py` 레시피 |
 
 자세한 동작 원리와 수치는 [`results/ver9_experiments.md`](./results/ver9_experiments.md)를 참고하세요.

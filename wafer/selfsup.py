@@ -231,15 +231,43 @@ def finetune(ds, lab_idx, sub, enc_path, args, out_dir, device):
     B = args.batch_size
     steps = math.ceil(len(lab_idx) / B)
     epochs = V3["ft_rounds"] * args.ft_epochs
+    attn_wd = getattr(args, "attn_wd", None)
     if args.class_pool:
         opt = torch.optim.AdamW([{"params": model.base.parameters()},
                                  {"params": [model.r], "lr": V3["ft_lr"] * 10, "weight_decay": 0.0}],
                                 lr=V3["ft_lr"], weight_decay=args.wd)
+    elif attn_wd is not None:
+        bb_decay, bb_no_decay, sa_decay, sa_no_decay = [], [], [], []
+        for name, param in model.named_parameters():
+            if not param.requires_grad:
+                continue
+            is_new = name.startswith(("layer3.sa.", "layer2.sa.", "layer3_sa.", "line_branch.", "line_scale", "avgpool.", "fc."))
+            no_decay = (param.ndim < 2) or name.endswith(".bias") or ("rel_pos_bias" in name) or ("pos_emb" in name)
+            if is_new:
+                (sa_no_decay if no_decay else sa_decay).append(param)
+            else:
+                (bb_no_decay if no_decay else bb_decay).append(param)
+        opt = torch.optim.AdamW([
+            {"params": bb_decay, "weight_decay": args.wd},
+            {"params": bb_no_decay, "weight_decay": 0.0},
+            {"params": sa_decay, "weight_decay": attn_wd},
+            {"params": sa_no_decay, "weight_decay": 0.0},
+        ], lr=V3["ft_lr"])
     else:
         opt = torch.optim.AdamW(model.parameters(), lr=V3["ft_lr"], weight_decay=args.wd)
-    # 미세조정 lr: --cosine 이면 lr*cos(7*pi*k/16K), 아니면 고정 (다른 방법들과 같은 조건)
-    sched = torch.optim.lr_scheduler.LambdaLR(
-        opt, (lambda k: math.cos(7 * math.pi * k / (16 * steps * epochs))) if args.cosine else (lambda k: 1.0))
+    # 미세조정 lr: warmup + cosine (ver9.8), --cosine 이면 lr*cos(7*pi*k/16K), 아니면 고정
+    total_steps = steps * epochs
+    warmup_steps = getattr(args, "warmup_epochs", 0) * steps
+    if warmup_steps > 0 and args.cosine:
+        def _lr_lambda(k):
+            if k < warmup_steps:
+                return 0.1 + 0.9 * (k / max(1, warmup_steps))
+            progress = (k - warmup_steps) / max(1, total_steps - warmup_steps)
+            return 0.05 + 0.95 * 0.5 * (1.0 + math.cos(math.pi * min(1.0, progress)))
+        sched = torch.optim.lr_scheduler.LambdaLR(opt, _lr_lambda)
+    else:
+        sched = torch.optim.lr_scheduler.LambdaLR(
+            opt, (lambda k: math.cos(7 * math.pi * k / (16 * total_steps))) if args.cosine else (lambda k: 1.0))
     scaler = torch.amp.GradScaler()
     lsampler = BalancedSampler(y_lab, args.seed, args.sample_pow)
     # ver7.8 / 7.81: none 클래스 손실 가중치만 낮춤, ver7.82 / 7.83: + Scratch 가중치 올림 (나머지 1.0), 모두 1.0 이면 일반 CE
@@ -281,6 +309,7 @@ def finetune(ds, lab_idx, sub, enc_path, args, out_dir, device):
             ep += 1
             model.train()
             aux_w = getattr(args, "aux_belief_w", 0.0)
+            ls = getattr(args, "label_smoothing", 0.0)
             grad_clip = getattr(args, "grad_clip", 0.0)
             t, acc = time.time(), dict(Ls=0.0, Lc=0.0, **({"Lt": 0.0} if args.triplet else {}), **({"La": 0.0} if aux_w > 0.0 else {}))
             for _ in range(steps):
@@ -291,6 +320,8 @@ def finetune(ds, lab_idx, sub, enc_path, args, out_dir, device):
                     if getattr(args, "frangi", None):   # 회전 전에 붙여 두 채널이 같은 회전 (nearest). ×2 → to_input (×0.5) 뒤 [0,1]
                         xl = torch.cat([xl, 2 * model.frangi(li, device)], 1)
                     xl = A.weak(xl, "rotate")
+                    if getattr(args, "use_hflip", False):
+                        xl = A.hflip(xl)
                     if psampler:
                         j = psampler(args.mu * B // 2)
                         xp = A.strong(ds.fetch(p_idx[j], device), None, 0.0, keep=False, ops=_ops(args))
@@ -308,7 +339,7 @@ def finetune(ds, lab_idx, sub, enc_path, args, out_dir, device):
                     else:
                         logits = model(to_input(xin)).float()
                 Ls = focal_loss(logits[:B], yl, args.focal) if args.focal else \
-                    F.cross_entropy(logits[:B], yl, weight=cw if (cw != 1.0).any() else None)
+                    F.cross_entropy(logits[:B], yl, weight=cw if (cw != 1.0).any() else None, label_smoothing=ls)
                 if args.triplet:   # ver7.4: 같은 클래스는 당기고 다른 클래스(None 포함)는 밀기
                     Lt = batch_hard_triplet(feat[:B], yl)
                     acc["Lt"] += Lt.item()
@@ -325,7 +356,7 @@ def finetune(ds, lab_idx, sub, enc_path, args, out_dir, device):
                     if step_logits:
                         n_st = len(step_logits)
                         w_sum = n_st * (n_st + 1) / 2.0
-                        La = sum(((i + 1) / w_sum) * F.cross_entropy(sl[:B], yl, weight=cw if (cw != 1.0).any() else None)
+                        La = sum(((i + 1) / w_sum) * F.cross_entropy(sl[:B], yl, weight=cw if (cw != 1.0).any() else None, label_smoothing=ls)
                                  for i, sl in enumerate(step_logits))
                         loss = loss + aux_w * La
                         acc["La"] += La.item()
